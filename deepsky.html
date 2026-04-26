@@ -437,7 +437,8 @@
       const title = rowTitle(row);
 
       // Helper to format exposure: e.g., "10 x 2.40 (24m)" -> "10 x 2m24s (24m)"
-      function formatExposure(totalImages, totalExptime) {
+      function formatExposure(totalImages, exptime) {
+        const totalExptime = totalImages * exptime;
         if (!totalImages || !totalExptime) return '';
         const frames = parseInt(totalImages);
         const totalMin = parseFloat(totalExptime) / 60;

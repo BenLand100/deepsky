@@ -1,11 +1,12 @@
 # Deep Sky
 
 This is a single-page gallery for Deep Sky images that displays the images on a celestial sphere, allowing the viewer to navigate interactively and appreciate relative sizes of images.
-It is based on Three.js in realtime and leverages Astrometry.net in initial setup for platesolving. 
-Either AI, prior organization, or significant diligence will be needed to get this setup.
+It is based on Three.js in realtime and leverages Astrometry.net in initial setup for platesolving.
+See [https://ben.land/deepsky/](https://ben.land/deepsky/) for a live demo.
 
 ## Initial Setup
 
+Either AI, prior organization, or significant diligence will be needed to get this setup. 
 Assuming you have a set of post-processed images (web-ready jpeg recommended), place them in a folder called `images`.
 The script `platesolve.py` can then be used to generate the `patches` with transformation and `results.csv` with platesolving by using Astrometry.net.
 ```bash
@@ -26,9 +27,13 @@ Finally run `thumbs.py` to generate thumbnails in the `thumbs` directory, and sa
 
 ## Hosting 
 
-You can either use `python -m http.server` and open `http://localhost:8000/deepsky.html` to view localally or move the following files to a hosted location of your choice:
+You can either use `python -m http.server` and open `http://localhost:8000/deepsky.html` to view locally or move the following files to a hosted location of your choice:
 ```
 deepsky.html live_images.csv starmap.jpg images thumbs patches
 ```
 optionally renaming `deepsky.html` to `index.html` as desired.
-No databases or other services are required.S
+No databases or other services are required.
+
+## Adding New Images
+
+Currently this can be done by repeating the above steps and adding the result to `live_images.csv`. Later a tool will help with this.

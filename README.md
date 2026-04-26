@@ -22,8 +22,12 @@ and information about the images processed with WBPP in PixInsight (via the incl
 ./xisfhdr.py  ~/astro/*/*masterLight*.xisf | tee wbpp.meta
 ```
 when asking an AI like Claude or Gemini to generate additional columns on that CSV containing camera, telescope, filter, and exposure information.
-You can customize how this is displayed, including removing or adding attributes, in the `panelHtml` function.
-Finally run `thumbs.py` to generate thumbnails in the `thumbs` directory, and save your augmented CSV as `live_images.csv`.
+You could of course do this with some tool of your choice, manually, or by joining to an existing database if you have one.
+
+Once columns are added to the CSV, or not, save it as `live_images.csv`.
+You can now customize how this information is displayed, including removing or adding attributes, in the `panelHtml` function.
+
+Finally run `thumbs.py` to generate thumbnails in the `thumbs` directory.
 
 ## Hosting 
 

@@ -207,7 +207,7 @@ def export_patch_json(wcs_file: Path, width_px: int, height_px: int, out_json: P
     out_json.write_text(json.dumps(out, indent=2), encoding="utf-8")
 
 
-def solve_one(path_str, api_key, upload_args, poll_seconds, submit_delay, max_wait_seconds, keep_wcs, wcs_dir, patch_json, patch_dir, patch_grid):
+def solve_one(path_str, api_key, upload_args, poll_seconds, submit_delay, max_wait_seconds, keep_wcs, wcs_dir, patch_json, patch_dir, patch_grid, reference_data=None):
     path = Path(path_str)
     row = {
         "file": str(path),
@@ -236,6 +236,14 @@ def solve_one(path_str, api_key, upload_args, poll_seconds, submit_delay, max_wa
             return row
 
         row["mtime"] = iso_mtime(path)
+        if reference_data and 'solve_status' in reference_data and reference_data["solve_status"] in {'solved', 'cached'}:
+            # Update the row with existing data
+            row.update(reference_data)
+            # Ensure critical fields remain correct
+            row["file"] = str(path)
+            row["mtime"] = iso_mtime(path)
+            row["solve_status"] = "cached"
+            return row
         width_px, height_px = image_size(path)
         row["width_px"] = width_px
         row["height_px"] = height_px
@@ -285,12 +293,26 @@ def solve_one(path_str, api_key, upload_args, poll_seconds, submit_delay, max_wa
         return row
 
 
+
+def load_reference_csv(ref_path):
+    reference_map = {}
+    with open(ref_path, newline="", encoding="utf-8") as f:
+        reader = csv.DictReader(f)
+        fieldnames = reader.fieldnames
+        for row in reader:
+            # We want the basename of the file in the "file" column as the key
+            fp = row.get("file")
+            if fp:
+                name = Path(fp).name
+                reference_map[name] = row
+    return fieldnames, reference_map
+
+
 def main():
     ap = argparse.ArgumentParser(description="Astrometry.net API batch solver with curved patch JSON export")
     ap.add_argument("input", help="Input directory OR CSV from a prior run")
     ap.add_argument("--api-key", required=True, help="Astrometry.net API key")
     ap.add_argument("--output", default="results.csv", help="Main output CSV")
-    ap.add_argument("--failures-output", default="failures.csv", help="Failures-only CSV")
     ap.add_argument("--recursive", action="store_true", help="Recurse into subdirectories when input is a directory")
     ap.add_argument("--workers", type=int, default=2, help="Parallel files in flight; default 2")
     ap.add_argument("--poll-seconds", type=int, default=20, help="Polling interval; default 20")
@@ -317,9 +339,13 @@ def main():
     ap.add_argument("--patch-json", action="store_true")
     ap.add_argument("--patch-dir", default="patches")
     ap.add_argument("--patch-grid", type=int, default=16)
+    ap.add_argument("--reference-csv", default=None, help="Use a previous results CSV as a reference")
     args = ap.parse_args()
 
     files = [p for p in read_input_paths(args.input, recursive=args.recursive) if p.suffix.lower() in IMAGE_EXTS]
+    reference_map = {}
+    if args.reference_csv:
+        reference_fieldnames, reference_map = load_reference_csv(args.reference_csv)
     if not files:
         print("No supported image files found.", file=sys.stderr)
         sys.exit(1)
@@ -349,20 +375,19 @@ def main():
         "center_ra_deg", "center_dec_deg", "pixscale_arcsec_per_px",
         "extent_width_deg", "extent_height_deg", "orientation_deg", "radius_deg",
         "solve_status", "saved_wcs_file", "patch_json_file", "error"
-    ]
+    ] if not args.reference_csv else reference_fieldnames
 
-    with open(args.output, "w", newline="", encoding="utf-8") as out_f, open(args.failures_output, "w", newline="", encoding="utf-8") as fail_f:
+    with open(args.output, "w", newline="", encoding="utf-8") as out_f:
         writer = csv.DictWriter(out_f, fieldnames=fieldnames)
-        fail_writer = csv.DictWriter(fail_f, fieldnames=fieldnames)
         writer.writeheader()
-        fail_writer.writeheader()
 
         with ThreadPoolExecutor(max_workers=args.workers) as ex:
             futs = [
                 ex.submit(
                     solve_one, str(p), args.api_key, upload_args, args.poll_seconds,
                     args.submit_delay, args.max_wait_seconds, args.keep_wcs,
-                    args.wcs_dir, args.patch_json, args.patch_dir, args.patch_grid
+                    args.wcs_dir, args.patch_json, args.patch_dir, args.patch_grid,
+                    reference_data=reference_map.get(p.name)
                 )
                 for p in files
             ]
@@ -370,9 +395,6 @@ def main():
                 row = fut.result()
                 writer.writerow(row)
                 out_f.flush()
-                if row["solve_status"] != "solved":
-                    fail_writer.writerow(row)
-                    fail_f.flush()
                 print(f"[{n}/{len(files)}] {row['solve_status']:>6} {row['file']}", flush=True)
 
 

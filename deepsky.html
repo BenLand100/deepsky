@@ -317,7 +317,7 @@
     }
 
     function deriveThumbUrl(row) {
-      return `${THUMB_BASE_URL}/${basename(row.file)}`;
+      return `${THUMB_BASE_URL}/${basename(row.file).replace(/\.png$/i, '.jpg')}`;
     }
 
     function derivePatchUrl(row) {
@@ -686,7 +686,7 @@
       clearPatches();
       try {
         const rows = await loadCsv(CSV_URL);
-        let solved = rows.filter(r => r.solve_status === 'solved' && r.patch_json_file);
+        let solved = rows.filter(r => (r.solve_status == 'solved' || r.solve_status == 'cached') && r.patch_json_file);
         setStatus(`Loading ${solved.length} curved patches...`);
 
         // Sort by angular area descending (larger/deeper)

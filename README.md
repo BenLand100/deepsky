@@ -41,3 +41,7 @@ No databases or other services are required.
 ## Adding New Images
 
 Currently this can be done by repeating the above steps and adding the result to `live_images.csv`. Later a tool will help with this.
+
+# Credits
+
+Background image is from NASA/Goddard Space Flight Center Scientific Visualization Studio. Gaia DR2: ESA/Gaia/DPAC. Constellation figures based on those developed for the IAU by Alan MacRobert of Sky and Telescope magazine (Roger Sinnott and Rick Fienberg).

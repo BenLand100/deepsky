@@ -2,18 +2,21 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <title>Deep Sky</title>
+  <title>Ben's Deep Sky</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <style>
     html, body { margin: 0; height: 100%; overflow: hidden; background: #000; color: #eee; font-family: system-ui, sans-serif; }
     #app { position: relative; width: 100%; height: 100%; }
     #hud { position: absolute; inset: 0; pointer-events: none; }
     #status { position: absolute; left: 12px; bottom: 12px; max-width: 520px; padding: 8px 10px; background: rgba(0,0,0,.5); border: 1px solid rgba(255,255,255,.12); border-radius: 10px; font-size: 13px; pointer-events: auto; z-index: 20; }
-    #zoomPanel,#panel { position: absolute; top: 12px; right: 12px; width: min(380px, calc(100vw - 24px)); max-height: calc(100vh - 24px); overflow: auto; padding: 14px; background: rgba(0,0,0,.7); border: 1px solid rgba(255,255,255,.12); border-radius: 12px; backdrop-filter: blur(10px); display: none; pointer-events: auto; z-index: 20; }
-    #zoomPanel,#panel img { width: 100%; height: auto; display: block; margin-top: 10px; border-radius: 8px; background: #111; }
-    #zoomPanel,#panel h2 { margin: 0 0 8px; font-size: 18px; }
-    #zoomPanel,#panel dl { margin: 10px 0 0; display: grid; grid-template-columns: max-content 1fr; gap: 6px 10px; font-size: 13px; }
-    #zoomPanel,#panel dt { color: #aaa; }
+    #panel { position: absolute; top: 12px; right: 12px; width: min(380px, calc(100vw - 24px)); max-height: calc(100vh - 24px); overflow: auto; padding: 14px; background: rgba(0,0,0,.7); border: 1px solid rgba(255,255,255,.12); border-radius: 12px; backdrop-filter: blur(10px); display: none; pointer-events: auto; z-index: 1000; }
+    #panel img { width: 100%; height: auto; display: block; margin-top: 10px; border-radius: 8px; background: #111; }
+    #panel h2 { margin: 0 0 8px; font-size: 18px; }
+    #panel dl { margin: 10px 0 0; display: grid; grid-template-columns: max-content 1fr; gap: 6px 10px; font-size: 13px; }
+    #panel dt { color: #aaa; }
+    #zoomPanel { position: absolute; top: 12px; right: 12px; width: min(380px, calc(100vw - 24px)); max-height: calc(100vh - 24px); overflow: auto; padding: 14px; background: rgba(0,0,0,.7); border: 1px solid rgba(255,255,255,.12); border-radius: 12px; backdrop-filter: blur(10px); pointer-events: auto; z-index: 1000; }
+    #zoomPanel dl { margin: 10px 0 0; display: grid; grid-template-columns: max-content 1fr; gap: 6px 10px; font-size: 13px; }
+    #zoomPanel dt { color: #aaa; }
 
     #overlay {
       position: fixed;
@@ -53,7 +56,7 @@
     }
 
     #overlayClose {
-      z-index: 2;
+      z-index: 2000;
     }
 
     .zoom-wrap {
@@ -131,7 +134,7 @@
     import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
     import { CSS2DRenderer, CSS2DObject } from 'three/examples/jsm/renderers/CSS2DRenderer.js';
 
-    const CSV_URL = './results.csv';
+    const CSV_URL = './live_images.csv';
     const IMAGE_BASE_URL = './images';
     const THUMB_BASE_URL = './thumbs';
     const PATCH_BASE_URL = './patches';
@@ -364,9 +367,28 @@
 
       tex.colorSpace = THREE.SRGBColorSpace;
       const geom = buildPatchGeometry(patchData, SKY_RADIUS * (1 - row.zOffset));
-      const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, side: THREE.DoubleSide, toneMapped: false, depthWrite: true});
+      const mat = new THREE.MeshBasicMaterial({
+        map: tex,
+        transparent: true,
+        side: THREE.DoubleSide,
+        toneMapped: false,
+        depthWrite: true,
+      });
       const mesh = new THREE.Mesh(geom, mat);
       mesh.userData = row;
+
+      // Glowing border
+      const edges = new THREE.EdgesGeometry(geom, 30);
+      const edgeMat = new THREE.LineBasicMaterial({
+        color: 0x00ffff,
+        linewidth: 2,
+        transparent: true,
+        opacity: 0.8,
+        toneMapped: false
+      });
+      const edgesMesh = new THREE.LineSegments(edges, edgeMat);
+      edgesMesh.userData = row;
+      mesh.add(edgesMesh);
       patchGroup.add(mesh);
       clickable.push(mesh);
 
@@ -379,21 +401,75 @@
       //mesh.userData._label = label;
     }
 
+    function rowTitle(row) {
+      const catalog = row.catalog_identifier || '';
+      const common = row.common_name || '';
+      return catalog && common ? `${catalog} - ${common}` : (catalog || common || basename(row.file));
+    }
+
+    function panelHtml(row) {
+
+      let RAhours = parseFloat(row.center_ra_deg) / 15;
+      let RAminutes = Math.floor((RAhours - Math.floor(RAhours)) * 60);
+      RAhours = Math.floor(RAhours);
+
+      // New title format
+      const title = rowTitle(row);
+
+      // Helper to format exposure: e.g., "10 x 2.40 (24m)" -> "10 x 2m24s (24m)"
+      function formatExposure(totalImages, totalExptime) {
+        if (!totalImages || !totalExptime) return '';
+        const frames = parseInt(totalImages);
+        const totalMin = parseFloat(totalExptime) / 60;
+        const hours = Math.floor(totalMin / 60);
+        const mins = Math.floor(totalMin % 60);
+        const expPerFrameMin = totalMin / frames;
+        const expHours = Math.floor(expPerFrameMin / 60);
+        const expMins = Math.floor((expPerFrameMin % 60));
+        const expStr = `${expHours ? expHours + 'h' : ''}${expMins}m`;
+        const totalStr = hours ? `${hours}h${mins}m` : `${mins}m`;
+        return `${frames} x ${expStr} (${totalStr})`;
+      }
+
+      // Collect exposure details
+      const exposures = [];
+      const filters = [
+        {key: 'OSC', images: 'OSC total images', exptime: 'OSC exptime'},
+        {key: 'L', images: 'L total images', exptime: 'L exptime'},
+        {key: 'R', images: 'R total images', exptime: 'R exptime'},
+        {key: 'G', images: 'G total images', exptime: 'G exptime'},
+        {key: 'B', images: 'B total images', exptime: 'B exptime'},
+        {key: 'Sii', images: 'Sii total images', exptime: 'Sii exptime'},
+        {key: 'Ha', images: 'Ha total images', exptime: 'Ha exptime'},
+        {key: 'Oiii', images: 'Oiii total images', exptime: 'Oiii exptime'}
+      ];
+      filters.forEach(f => {
+        const exp = formatExposure(row[f.images], row[f.exptime]);
+        if (exp) exposures.push(`${f.key}: ${exp}`);
+      });
+
+      return `
+        <dl>
+          <dt>Camera</dt><dd>${row.Camera || ''}</dd>
+          <dt>Telescope</dt><dd>${row.Telescope || ''}</dd>
+          <dt>Image Type</dt><dd>${row['Image Type'] || 'Other'}${row['OSC filter'] ? (" - " + row['OSC filter']) : ""}</dd>
+          ${exposures.length ? exposures.map(exp => `<dt>${exp.split(': ')[0]}</dt><dd>${exp.split(': ')[1]}</dd>`).join('') : ''}
+          <dt>RA/Dec</dt><dd>${RAhours}h${RAminutes.toString().padStart(2,'0')}m ${parseFloat(row.center_dec_deg).toFixed(1)}°</dd>
+          <dt>Size</dt><dd>${(parseFloat(row.extent_width_deg)*60).toFixed(1)} x ${(parseFloat(row.extent_height_deg)*60).toFixed(1)} arcmin</dd>
+          <dt>Pixel Scale</dt><dd>${parseFloat(row.pixscale_arcsec_per_px).toFixed(2)} arcsec/px</dd>
+          <dt>Processed on</dt><dd>${row.mtime ? row.mtime.split('T')[0] : 'N/A'}</dd>
+          <dt>Filename</dt><dd>${basename(row.file)}</dd>
+        </dl>
+      `;
+    }
+
     function showPanel(row) {
-      const imgUrl = deriveThumbUrl(row);
-      let RAhours = parseFloat(row.center_ra_deg)/15;
-      let RAminutes = Math.floor((RAhours - Math.floor(RAhours))*60);
-      RAhours = Math.floor(RAhours)
+      const title  = rowTitle(row);
       panelEl.style.display = 'block';
       panelEl.innerHTML = `
-        <h2>${basename(row.file)}</h2>
-        <dl>
-          <dt>RA / Dec</dt><dd>${RAhours}h${RAminutes}m / ${parseFloat(row.center_dec_deg).toFixed(1)} deg</dd>
-          <dt>Size</dt><dd>${parseFloat(row.extent_width_deg*60).toFixed(1) || ''} x ${parseFloat(row.extent_height_deg*60).toFixed(1) || ''} arcmin</dd>
-          <dt>Pixel Scale</dt><dd>${parseFloat(row.pixscale_arcsec_per_px).toFixed(2) || ''} arcsec/px</dd>
-          <dt>Processed on</dt><dd>${row.mtime.split('T')[0] || ''}</dd>
-        </dl>
-        <img src="${imgUrl}" alt="${basename(row.file)}">
+        <h2>${title}</h2>
+        ${panelHtml(row)}
+        <img src="${deriveThumbUrl(row)}" alt="${title}">
       `;
     }
 
@@ -403,21 +479,22 @@
     }
 
     function expandedView(row) {
-      const imgUrl = deriveImageUrl(row);
       overlayEl.style.display = 'block';
       overlayContentEl.innerHTML = `
         <div id="overlayWindow">
           <div class="zoom-toolbar">
-            <h2>${basename(row.file)}</h2>
+            <h2>${rowTitle(row)}</h2>
             <button id="zoomReset">Reset</button>
             <button id="zoomOut">-</button>
             <button id="zoomIn">+</button>
             <button id="overlayClose">Close</button>
           </div>
           <div class="zoom-wrap" id="zoomWrap">
-            <div class="zoomPanel"></div>
+            <div id="zoomPanel">
+            ${panelHtml(row)}
+            </div>
             <div class="zoom-stage" id="zoomStage">
-              <img src="${imgUrl}" alt="${basename(row.file)}">
+              <img src="${deriveImageUrl(row)}" alt="${basename(row.file)}">
             </div>
           </div>
           <div class="zoom-hint">Wheel to zoom, drag to pan, double-click to reset.</div>
@@ -633,7 +710,6 @@
       const zoomFactor = event.deltaY > 0 ? 1.08 : 0.92;
       camera.fov = THREE.MathUtils.clamp(camera.fov * zoomFactor, 1, 100);
       camera.updateProjectionMatrix();
-      console.log(camera.fov);
       controls.rotateSpeed = THREE.MathUtils.clamp(camera.fov / 50 * -0.35, -0.75, -0.001);
     }
 

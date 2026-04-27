@@ -433,7 +433,38 @@
 
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 5000);
-    camera.position.set(0, 0, 0.1);
+
+    function antiSolarRaDec(date = new Date()) {
+      // Days since J2000.0
+      const n = (date - Date.UTC(2000, 0, 1, 12)) / 86400000;
+
+      // Sun mean longitude and mean anomaly (degrees)
+      const L = (280.460 + 0.9856474 * n) % 360;
+      const g = THREE.MathUtils.degToRad((357.528 + 0.9856003 * n) % 360);
+
+      // Ecliptic longitude (degrees)
+      const lambda = THREE.MathUtils.degToRad(
+        L + 1.915 * Math.sin(g) + 0.020 * Math.sin(2 * g)
+      );
+
+      // Obliquity of the ecliptic (degrees → radians)
+      const eps = THREE.MathUtils.degToRad(23.439 - 0.0000004 * n);
+
+      // Sun's equatorial RA/Dec
+      const sunRa  = Math.atan2(Math.cos(eps) * Math.sin(lambda), Math.cos(lambda));
+      const sunDec = Math.asin(Math.sin(eps) * Math.sin(lambda));
+
+      // Anti-solar point: flip RA by 180°, negate Dec
+      const ra  = (THREE.MathUtils.radToDeg(sunRa) + 180 + 360) % 360;
+      const dec = -THREE.MathUtils.radToDeg(sunDec);
+
+      return { ra, dec };
+    }
+    const { ra, dec } = antiSolarRaDec();
+    const patchDir  = radecToVec3(ra, dec+45, 1).normalize();
+    camera.position.copy(patchDir.clone().negate().multiplyScalar(0.1));
+    camera.lookAt(0, 0, 0);
+    //camera.position.set(0, 0, 0.1);
 
     const renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setPixelRatio(window.devicePixelRatio);
@@ -495,14 +526,8 @@
       return new THREE.Line(geom, mat);
     }
 
-    function raDecToVec3Overlay(raDeg, decDeg, radius = SKY_RADIUS + 2) {
-      const ra = THREE.MathUtils.degToRad(Number(raDeg));
-      const dec = THREE.MathUtils.degToRad(Number(decDeg));
-      return new THREE.Vector3(
-        radius * Math.cos(dec) * Math.cos(ra),
-        radius * Math.sin(dec),
-        radius * Math.cos(dec) * Math.sin(ra)
-      );
+    function radecToVec3Overlay(raDeg, decDeg, radius = SKY_RADIUS + 2) {
+      return radecToVec3(raDeg, decDeg, radius);
     }
 
     function buildRaDecOverlay() {
@@ -515,7 +540,7 @@
       for (let ra = 0; ra < 360; ra += raStep) {
         const pts = [];
         for (let dec = -89; dec <= 89; dec += sampleStep) {
-          pts.push(raDecToVec3Overlay(ra, dec));
+          pts.push(radecToVec3Overlay(ra, dec));
         }
         overlayGroup.add(makeLine(pts, 0x4ea1ff, 0.28));
 
@@ -524,14 +549,14 @@
         labelEl.textContent = `${String(Math.round(ra / 15)).padStart(2, '0')}h`;
         labelEl.style.color = '#8fc6ff';
         const label = new CSS2DObject(labelEl);
-        label.position.copy(raDecToVec3Overlay(ra, 0, SKY_RADIUS + 20));
+        label.position.copy(radecToVec3Overlay(ra, 0, SKY_RADIUS + 20));
         overlayGroup.add(label);
       }
 
       for (let dec = decMin; dec <= decMax; dec += decStep) {
         const pts = [];
         for (let ra = 0; ra <= 360; ra += sampleStep) {
-          pts.push(raDecToVec3Overlay(ra, dec));
+          pts.push(radecToVec3Overlay(ra, dec));
         }
         overlayGroup.add(makeLine(pts, 0x6ee7b7, 0.22));
 
@@ -540,7 +565,7 @@
         labelEl.textContent = `${dec > 0 ? '+' : ''}${dec}°`;
         labelEl.style.color = '#9af0cc';
         const label = new CSS2DObject(labelEl);
-        label.position.copy(raDecToVec3Overlay(0, dec, SKY_RADIUS + 20));
+        label.position.copy(radecToVec3Overlay(0, dec, SKY_RADIUS + 20));
         overlayGroup.add(label);
       }
     }
@@ -548,6 +573,8 @@
     const skyGeo = new THREE.SphereGeometry(1000, 64, 32);
     const skyTex = textureLoader.load(SKY_URL);
     skyTex.colorSpace = THREE.SRGBColorSpace;
+    skyTex.repeat.set(-1, 1);
+    skyTex.offset.set(1, 0);
     const skyMat = new THREE.MeshBasicMaterial({ map: skyTex, side: THREE.BackSide, toneMapped: false });
     const skyMesh = new THREE.Mesh(skyGeo, skyMat);
     scene.add(skyMesh);
@@ -793,7 +820,7 @@
       return new THREE.Vector3(
         radius * Math.cos(dec) * Math.cos(ra),
         radius * Math.sin(dec),
-        radius * Math.cos(dec) * Math.sin(ra)
+        -radius * Math.cos(dec) * Math.sin(ra)
       );
     }
 

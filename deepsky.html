@@ -127,6 +127,154 @@
     }
 
     .label { color: #fff; font: 12px/1.2 system-ui, sans-serif; text-shadow: 0 0 8px rgba(0,0,0,.95); white-space: nowrap; pointer-events: none; }
+
+    #listToggle {
+      position: absolute;
+      top: 12px;
+      left: 12px;
+      z-index: 1001;
+      background: rgba(0,0,0,.7);
+      color: #eee;
+      border: 1px solid rgba(255,255,255,.15);
+      border-radius: 8px;
+      padding: 6px 12px;
+      font-size: 18px;
+      cursor: pointer;
+      pointer-events: auto;
+      backdrop-filter: blur(10px);
+    }
+
+    #listSidebar {
+      display: none;
+      position: absolute;
+      top: 60px;
+      left: 12px;
+      width: min(340px, calc(100vw - 62px));
+      max-height: calc(100vh - 127px);
+      background: rgba(0,0,0,.75);
+      border: 1px solid rgba(255,255,255,.12);
+      border-radius: 12px;
+      backdrop-filter: blur(10px);
+      z-index: 1000;
+      pointer-events: auto;
+      display: none;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    #filterBar {
+      padding: 10px 12px 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      border-bottom: 1px solid rgba(255,255,255,.1);
+      flex-shrink: 0;
+    }
+
+    #filterBar input, #filterBar select {
+      background: rgba(255,255,255,.07);
+      color: #eee;
+      border: 1px solid rgba(255,255,255,.15);
+      border-radius: 6px;
+      padding: 5px 8px;
+      font-size: 12px;
+      width: 100%;
+      box-sizing: border-box;
+    }
+
+    #filterBar select option { background: #111; }
+
+    .filter-row {
+      display: flex;
+      gap: 6px;
+    }
+
+    .filter-row select { flex: 1; }
+
+    .filter-actions {
+      display: flex;
+      gap: 6px;
+      margin-top: 2px;
+    }
+
+    .filter-actions button {
+      flex: 1;
+      background: rgba(255,255,255,.08);
+      color: #eee;
+      border: 1px solid rgba(255,255,255,.15);
+      border-radius: 6px;
+      padding: 4px 8px;
+      font-size: 11px;
+      cursor: pointer;
+    }
+
+    #objectList {
+      overflow-y: auto;
+      flex: 1;
+      padding: 6px 0;
+    }
+
+    .list-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 12px;
+      cursor: default;
+      transition: background 0.15s;
+    }
+
+    .list-item:hover { background: rgba(255,255,255,.06); }
+
+    .list-item.item-hidden { opacity: 0.35; }
+
+    .list-thumb {
+      width: 48px;
+      height: 36px;
+      object-fit: cover;
+      border-radius: 4px;
+      background: #111;
+      flex-shrink: 0;
+    }
+
+    .list-meta {
+      flex: 1;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .list-title {
+      font-size: 13px;
+      color: #eee;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .list-date {
+      font-size: 11px;
+      color: #888;
+    }
+
+    .list-actions {
+      display: flex;
+      gap: 4px;
+      flex-shrink: 0;
+    }
+
+    .list-actions button {
+      background: rgba(255,255,255,.08);
+      color: #eee;
+      border: 1px solid rgba(255,255,255,.12);
+      border-radius: 6px;
+      padding: 4px 7px;
+      font-size: 14px;
+      cursor: pointer;
+      line-height: 1;
+    }
+
+    .list-actions button:hover { background: rgba(255,255,255,.18); }
   </style>
   <script type="importmap">
   {
@@ -143,6 +291,11 @@
       <div id="panel"></div>
       <div id="status">Loading…</div>
     </div>
+    <button id="listToggle">☰</button>
+    <div id="listSidebar">
+      <div id="filterBar"><!-- dynamic filter controls --></div>
+      <div id="objectList"><!-- dynamic list items --></div>
+    </div>
     <div id="overlay" style="display:none;">
       <div id="overlayBackdrop"></div>
       <div id="overlayContent"></div>
@@ -153,6 +306,8 @@
     import * as THREE from 'three';
     import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
     import { CSS2DRenderer, CSS2DObject } from 'three/examples/jsm/renderers/CSS2DRenderer.js';
+
+    let fully_loaded = false;
 
     const CSV_URL = './live_images.csv';
     const IMAGE_BASE_URL = './images';
@@ -325,6 +480,185 @@
       return `${PATCH_BASE_URL}/${basename(row.file).replace(/\.[^.]+$/, '')}.patch.json`;
     }
 
+    function rowTitle(row) {
+      const catalog = row.catalog_identifier || '';
+      const common = row.common_name || '';
+      return catalog && common ? `${catalog} - ${common}` : (catalog || common || basename(row.file));
+    }
+
+    const hiddenSet = new Set();
+    const listToggleEl   = document.getElementById('listToggle');
+    const listSidebarEl  = document.getElementById('listSidebar');
+    const filterBarEl    = document.getElementById('filterBar');
+    const objectListEl   = document.getElementById('objectList');
+
+    function applyFilters() {
+      const query    = filterBarEl.querySelector('#fSearch').value.toLowerCase();
+      const camVal   = filterBarEl.querySelector('#fCamera').value;
+      const typeVal  = filterBarEl.querySelector('#fType').value;
+
+      let total = 0;
+      for (const mesh of clickable) {
+        const row = mesh.userData;
+        const passFilter =
+          (!camVal  || row.Camera === camVal) &&
+          (!typeVal || row['Image Type'] === typeVal) &&
+          (!query   || rowTitle(row).toLowerCase().includes(query));
+
+        const passToggle = !hiddenSet.has(row.file);
+        const visible = passFilter && passToggle;
+        if (visible) total += 1;
+        mesh.visible = visible;
+        if (mesh.userData.label) mesh.userData.label.visible = visible;
+        // Show/hide the list item to match the filter
+        const listItem = objectListEl.querySelector(`[data-file="${CSS.escape(row.file)}"]`);
+        if (listItem) listItem.style.display = passFilter ? 'flex' : 'none';
+      }
+      setStatus(`Showing ${total} patches.`);
+    }
+
+
+    function buildListItem(mesh) {
+      const row  = mesh.userData;
+      const item = document.createElement('div');
+      item.addEventListener('mouseenter', () => {
+        console.log('Entered!');
+        listHovering = true;
+        showPanel(row);
+      });
+      item.addEventListener('mouseleave', () => {
+        listHovering = false;
+        hidePanel();
+      });
+      item.className = 'list-item';
+      item.dataset.file = row.file
+      if (hiddenSet.has(row.file)) item.classList.add('item-hidden');
+
+      const thumb = document.createElement('img');
+      thumb.className = 'list-thumb';
+      thumb.src = deriveThumbUrl(row);
+      thumb.alt = rowTitle(row);
+
+      const meta = document.createElement('div');
+      meta.className = 'list-meta';
+      meta.innerHTML = `
+        <span class="list-title">${rowTitle(row)}</span>
+        <span class="list-date">${row.mtime?.split('T')[0] ?? ''}</span>`;
+
+      const actions = document.createElement('div');
+      actions.className = 'list-actions';
+
+      const eyeBtn = document.createElement('button');
+      eyeBtn.title = 'Toggle visibility';
+      eyeBtn.textContent = '👁';
+      eyeBtn.onclick = () => {
+        if (hiddenSet.has(row.file)) hiddenSet.delete(row.file);
+        else hiddenSet.add(row.file);
+        item.classList.toggle('item-hidden');
+        applyFilters();
+      };
+
+      const expandBtn = document.createElement('button');
+      expandBtn.title = 'Expanded view';
+      expandBtn.textContent = '⛶';
+      expandBtn.onclick = () => expandedView(row);
+
+      const flyBtn = document.createElement('button');
+      flyBtn.title = 'Zoom to on sky';
+      flyBtn.textContent = '🎯';
+      flyBtn.onclick = () => flyToRow(row);
+
+      actions.append(eyeBtn, expandBtn, flyBtn);
+      item.append(thumb, meta, actions);
+      return item;
+    }
+
+    function buildFilterBar(rows) {
+      const cameras = [...new Set(rows.map(r => r.Camera).filter(Boolean))].sort();
+      const types   = [...new Set(rows.map(r => r['Image Type']).filter(Boolean))].sort();
+
+      const cameraOpts = cameras.map(c => `<option value="${c}">${c}</option>`).join('');
+      const typeOpts   = types.map(t => `<option value="${t}">${t}</option>`).join('');
+
+      filterBarEl.innerHTML = `
+        <input id="fSearch" type="search" placeholder="Search by name…">
+        <div class="filter-row">
+          <select id="fCamera"><option value="">All cameras</option>${cameraOpts}</select>
+          <select id="fType"><option value="">All types</option>${typeOpts}</select>
+        </div>
+        <div class="filter-actions">
+          <button id="fShowAll">Show all</button>
+          <button id="fHideAll">Hide all</button>
+        </div>`;
+
+      filterBarEl.querySelector('#fSearch').oninput = applyFilters;
+      filterBarEl.querySelector('#fCamera').onchange = applyFilters;
+      filterBarEl.querySelector('#fType').onchange = applyFilters;
+
+      filterBarEl.querySelector('#fShowAll').onclick = () => {
+        hiddenSet.clear();
+        objectListEl.querySelectorAll('.list-item').forEach(el => el.classList.remove('item-hidden'));
+        applyFilters();
+      };
+
+      filterBarEl.querySelector('#fHideAll').onclick = () => {
+        clickable.forEach(m => hiddenSet.add(m.userData.file));
+        objectListEl.querySelectorAll('.list-item').forEach(el => el.classList.add('item-hidden'));
+        applyFilters();
+      };
+    }
+
+    function buildSidebar() {
+      const rows = clickable.map(m => m.userData);
+      buildFilterBar(rows);
+      objectListEl.innerHTML = '';
+      for (const mesh of clickable) {
+        objectListEl.appendChild(buildListItem(mesh));
+      }
+    }
+
+    // Toggle button wires up and lazily populates on first open
+    let sidebarBuilt = false;
+    listToggleEl.onclick = () => {
+      if (!fully_loaded) return;
+      const open = listSidebarEl.style.display === 'flex';
+      listSidebarEl.style.display = open ? 'none' : 'flex';
+      if (!open && !sidebarBuilt) {
+        buildSidebar();
+        sidebarBuilt = true;
+      }
+    };
+
+    let flyState = null;
+
+    function flyToRow(row) {
+      const ra  = parseFloat(row.center_ra_deg);
+      const dec = parseFloat(row.center_dec_deg);
+
+      // Unit vector pointing toward the image on the sky
+      const patchDir = radecToVec3(ra, dec, 1).normalize();
+
+      // Camera sits on opposite side of origin so it looks outward at patchDir
+      const camRadius = camera.position.length();
+      const targetPos = patchDir.clone().negate().multiplyScalar(camRadius);
+
+      // FOV sized to image angular extent with 2× breathing room
+      const angDeg = Math.max(
+        parseFloat(row.extent_width_deg) || 2,
+        parseFloat(row.extent_height_deg) || 2
+      );
+      const targetFov = Math.min(60, Math.max(1.5, angDeg * 2.0));
+
+      flyState = {
+        fromPos: camera.position.clone(),
+        toPos:   targetPos,
+        fromFov: camera.fov,
+        toFov:   targetFov,
+        t: 0
+      };
+      controls.enabled = false;
+    }
+
     function radecToVec3(raDeg, decDeg, radius = SKY_RADIUS) {
       const ra = THREE.MathUtils.degToRad(Number(raDeg));
       const dec = THREE.MathUtils.degToRad(Number(decDeg));
@@ -421,12 +755,6 @@
       //mesh.userData._label = label;
     }
 
-    function rowTitle(row) {
-      const catalog = row.catalog_identifier || '';
-      const common = row.common_name || '';
-      return catalog && common ? `${catalog} - ${common}` : (catalog || common || basename(row.file));
-    }
-
     function panelHtml(row) {
 
       let RAhours = parseFloat(row.center_ra_deg) / 15;
@@ -475,8 +803,8 @@
           <dt>Telescope</dt><dd>${row.Telescope || ''}</dd>
           <dt>Image Type</dt><dd>${row['Image Type'] || 'Other'}${row['OSC filter'] ? (" - " + row['OSC filter']) : ""}</dd>
           ${exposures.length ? exposures.map(exp => `<dt>${exp.split(': ')[0]}</dt><dd>${exp.split(': ')[1]}</dd>`).join('') : ''}
-          <dt>RA/Dec</dt><dd>${RAhours}h${RAminutes.toString().padStart(2,'0')}m ${parseFloat(row.center_dec_deg).toFixed(1)}°</dd>
-          <dt>Size</dt><dd>${(parseFloat(row.extent_width_deg)*60).toFixed(1)} x ${(parseFloat(row.extent_height_deg)*60).toFixed(1)} arcmin</dd>
+          <dt>RA / Dec</dt><dd>${RAhours}h${RAminutes.toString().padStart(2,'0')}m / ${parseFloat(row.center_dec_deg).toFixed(1)}° </dd>
+          <dt>Image Extent</dt><dd>${(parseFloat(row.extent_width_deg)*60).toFixed(1)} x ${(parseFloat(row.extent_height_deg)*60).toFixed(1)} arcmin</dd>
           <dt>Pixel Scale</dt><dd>${parseFloat(row.pixscale_arcsec_per_px).toFixed(2)} arcsec/px</dd>
           <dt>Processed on</dt><dd>${row.mtime ? row.mtime.split('T')[0] : 'N/A'}</dd>
           <dt>Filename</dt><dd>${basename(row.file)}</dd>
@@ -610,12 +938,14 @@
         mesh.visible = true;
         if (mesh.userData._label) mesh.userData._label.visible = true;
       }
-      setStatus(`Showing ${clickable.length} patches`);
     }
 
+    let listHovering = false;
     let hoveredMeshes = [], cycleIndex = 0;
 
     function refreshHoverPromotion() {
+      if (listHovering) return;
+
       clickable.forEach(m => {
         m.scale.setScalar(1.0);
       });
@@ -644,6 +974,12 @@
     let didDrag = false;
     const DRAG_THRESHOLD = 6; // pixels
 
+    function isUIEvent(event) {
+      return event.target.closest(
+        '#panel, #listSidebar, #listToggle, #overlay, #status, #zoomPanel'
+      );
+    }
+
     function onPointerDown(event) {
       pressX = event.clientX;
       pressY = event.clientY;
@@ -651,17 +987,19 @@
     }
 
     function onPointerMove(event) {
-      pointer.x = (event.clientX / window.innerWidth) * 2 - 1;
-      pointer.y = -(event.clientY / window.innerHeight) * 2 + 1;
-
       const dx = event.clientX - pressX;
       const dy = event.clientY - pressY;
       if ((dx * dx + dy * dy) > DRAG_THRESHOLD * DRAG_THRESHOLD) {
         didDrag = true;
       }
 
+      if (isUIEvent(event)) return;
+
+      pointer.x = (event.clientX / window.innerWidth) * 2 - 1;
+      pointer.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
       raycaster.setFromCamera(pointer, camera);
-      let unsortMeshes = raycaster.intersectObjects(clickable);
+      let unsortMeshes = raycaster.intersectObjects(clickable, false);
       unsortMeshes.sort((a, b) => {
         const sizeA = parseFloat(a.object.userData.extent_width_deg || 0) * parseFloat(a.object.userData.extent_height_deg || 0);
         const sizeB = parseFloat(b.object.userData.extent_width_deg || 0) * parseFloat(b.object.userData.extent_height_deg || 0);
@@ -673,9 +1011,10 @@
     }
 
     function onClick(event) {
+      if (isUIEvent(event)) return;
       if (didDrag) return;
       raycaster.setFromCamera(pointer, camera);
-      const hits = raycaster.intersectObjects(clickable);
+      const hits = raycaster.intersectObjects(clickable, false);
       if (!hits.length) return;
       hoveredMeshes = [];
       expandedView(hits[0].object.userData);
@@ -708,12 +1047,14 @@
           }
           rank++;
         }
+        clickable.sort((a, b) => (b.userData.mtime ?? '').localeCompare(a.userData.mtime ?? ''));
         showAllPatches();
-        setStatus(`Showing ${clickable.length} patches`);
+        setStatus(`Showing ${clickable.length} patches.`);
       } catch (err) {
         console.error(err);
         setStatus(`Error: ${err.message}`);
       }
+      fully_loaded = true;
     }
 
     window.addEventListener('pointerdown', onPointerDown);
@@ -738,11 +1079,30 @@
 
     function animate() {
       requestAnimationFrame(animate);
-      controls.update();
+
+      if (flyState) {
+        flyState.t = Math.min(1, flyState.t + 0.022);           // ~45 frame flight
+        const ease = 1 - Math.pow(1 - flyState.t, 3);           // cubic ease-out
+
+        camera.position.lerpVectors(flyState.fromPos, flyState.toPos, ease);
+        camera.fov = flyState.fromFov + (flyState.toFov - flyState.fromFov) * ease;
+        camera.lookAt(0, 0, 0);
+        camera.updateProjectionMatrix();
+
+        // Also keep rotateSpeed in sync with the live fov (your existing behavior)
+        controls.rotateSpeed = THREE.MathUtils.clamp(camera.fov / 50 * -0.35, -0.75, -0.001);
+
+        if (flyState.t >= 1) {
+          controls.enabled = true;   // OrbitControls re-syncs from camera.position on first update()
+          flyState = null;
+        }
+      } else {
+        controls.update();
+      }
+
       renderer.render(scene, camera);
       labelRenderer.render(scene, camera);
     }
-
     buildRaDecOverlay();
     reloadCatalog();
     animate();

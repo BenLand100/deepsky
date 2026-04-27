@@ -1155,7 +1155,7 @@
       pointer.y = -(event.clientY / window.innerHeight) * 2 + 1;
 
       raycaster.setFromCamera(pointer, camera);
-      let unsortMeshes = raycaster.intersectObjects(clickable, false);
+      let unsortMeshes = raycaster.intersectObjects(clickable.filter(m => m.visible), false);
       unsortMeshes.sort((a, b) => {
         const sizeA = parseFloat(a.object.userData.extent_width_deg || 0) * parseFloat(a.object.userData.extent_height_deg || 0);
         const sizeB = parseFloat(b.object.userData.extent_width_deg || 0) * parseFloat(b.object.userData.extent_height_deg || 0);
@@ -1170,7 +1170,7 @@
       if (isUIEvent(event)) return;
       if (didDrag) return;
       raycaster.setFromCamera(pointer, camera);
-      const hits = raycaster.intersectObjects(clickable, false);
+      const hits = raycaster.intersectObjects(clickable.filter(m => m.visible), false);
       if (!hits.length) return;
       hoveredMeshes = [];
       expandedView(hits[0].object.userData);

@@ -29,6 +29,7 @@
     #app { position: relative; width: 100%; height: 100%; }
     #hud { position: absolute; inset: 0; pointer-events: none; }
     #status { position: absolute; left: 12px; bottom: 12px; max-width: 520px; padding: 8px 10px; background: rgba(0,0,0,.5); border: 1px solid rgba(255,255,255,.12); border-radius: 10px; font-size: 13px; pointer-events: auto; z-index: 20; }
+    #copyright { position: absolute; right: 60px; bottom: 12px; max-width: 520px; padding: 8px 10px; background: rgba(0,0,0,.5); border: 1px solid rgba(255,255,255,.12); border-radius: 10px; font-size: 13px; pointer-events: auto; z-index: 20; }
     #panel { position: absolute; top: 12px; right: 12px; width: min(380px, calc(100vw - 24px)); max-height: calc(100vh - 24px); overflow: auto; padding: 14px; background: rgba(0,0,0,.7); border: 1px solid rgba(255,255,255,.12); border-radius: 12px; backdrop-filter: blur(10px); display: none; pointer-events: auto; z-index: 1000; }
     #panel img { width: 100%; height: auto; display: block; margin-top: 10px; border-radius: 8px; background: #111; }
     #panel h2 { margin: 0 0 8px; font-size: 18px; }
@@ -275,6 +276,77 @@
     }
 
     .list-actions button:hover { background: rgba(255,255,255,.18); }
+
+    #helpToggle {
+      position: absolute;
+      bottom: 12px;
+      right: 12px;
+      z-index: 1001;
+      background: rgba(0,0,0,.7);
+      color: #eee;
+      border: 1px solid rgba(255,255,255,.15);
+      border-radius: 50%;
+      width: 34px;
+      height: 34px;
+      font-size: 16px;
+      cursor: pointer;
+      pointer-events: auto;
+      backdrop-filter: blur(10px);
+    }
+
+    #helpPanel {
+      display: auto;
+      position: absolute;
+      bottom: 54px;
+      right: 12px;
+      width: min(340px, calc(100vw - 24px));
+      max-height: calc(100vh - 80px);
+      overflow-y: auto;
+      background: rgba(0,0,0,.80);
+      border: 1px solid rgba(255,255,255,.12);
+      border-radius: 12px;
+      backdrop-filter: blur(10px);
+      padding: 16px;
+      z-index: 1000;
+      pointer-events: auto;
+      color: #eee;
+      font-size: 13px;
+      line-height: 1.6;
+      box-sizing: border-box;
+    }
+
+    #helpPanel h2 {
+      margin: 0 0 10px;
+      font-size: 17px;
+    }
+
+    #helpPanel h3 {
+      margin: 14px 0 6px;
+      font-size: 13px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: #aaa;
+    }
+
+    #helpPanel p, #helpPanel ul {
+      margin: 0;
+      padding-left: 18px;
+    }
+
+    #helpPanel li { margin-bottom: 4px; }
+
+    #helpClose {
+      float: right;
+      background: none;
+      border: none;
+      color: #aaa;
+      font-size: 16px;
+      cursor: pointer;
+      padding: 0 0 4px 8px;
+    }
+
+    #helpClose:hover { color: #eee; }
+
   </style>
   <script type="importmap">
   {
@@ -289,12 +361,48 @@
   <div id="app">
     <div id="hud">
       <div id="panel"></div>
-      <div id="status">Loading…</div>
+      <div id="status">Loading...</div>
+      <div id="copyright">Copyright 2023-2026 Benjamin J. Land</div>
     </div>
     <button id="listToggle">☰</button>
     <div id="listSidebar">
       <div id="filterBar"><!-- dynamic filter controls --></div>
       <div id="objectList"><!-- dynamic list items --></div>
+    </div>
+    <button id="helpToggle">?</button>
+    <div id="helpPanel">
+      <button id="helpClose">✕</button>
+      <h2>Ben's Deep Sky</h2>
+      <p>
+        Welcome to an interactive 3D presentation of my astrophotography placed at true scale against the night sky.
+      </p>
+      <p>
+        Each image is projected onto the celestial sphere at its actual angular size and position then surrounded in a cyan box to make them distinct.
+        Click for a full scale image, or check out the list at the top left.
+      </p>
+      <p>
+        You may also be interested in <a href="https://ben.land/astro/">a less interactive gallery</a> of these images.
+        I have also written <a href="https://ben.land/categories/astrophotography/">several blog posts</a> on the process and details of select images.
+      </p>
+      <h3>Navigation</h3>
+      <ul>
+        <li><strong>Drag</strong> — rotate the sky</li>
+        <li><strong>Scroll</strong> — zoom in/out</li>
+        <li><strong>Click an image</strong> — open full expanded view</li>
+        <li><strong>Hover an image</strong> — show details panel</li>
+      </ul>
+      <h3>List Panel (☰)</h3>
+      <ul>
+        <li>Filter images by camera or type</li>
+        <li><strong>👁</strong> — toggle visibility on the sky</li>
+        <li><strong>⛶</strong> — open expanded view</li>
+        <li><strong>🎯</strong> — fly to image on the sky</li>
+      </ul>
+      <h3>Credits</h3>
+      <p>
+        The background image is provided by NASA/Goddard Space Flight Center
+        <a href="https://svs.gsfc.nasa.gov/4851/">Scientific Visualization Studio</a>.
+      </p>
     </div>
     <div id="overlay" style="display:none;">
       <div id="overlayBackdrop"></div>
@@ -360,6 +468,26 @@
 
     const overlayGroup = new THREE.Group();
     scene.add(overlayGroup);
+
+    const helpToggleEl = document.getElementById('helpToggle');
+    const helpPanelEl  = document.getElementById('helpPanel');
+    const helpCloseEl  = document.getElementById('helpClose');
+
+    helpToggleEl.onclick = () => {
+      const open = helpPanelEl.style.display === 'block';
+      helpPanelEl.style.display = open ? 'none' : 'block';
+    };
+
+    helpCloseEl.onclick = () => {
+      helpPanelEl.style.display = 'none';
+    };
+
+    // Close if user clicks anywhere outside the panel or toggle button
+    document.addEventListener('mousedown', (e) => {
+      if (!helpPanelEl.contains(e.target) && e.target !== helpToggleEl) {
+        helpPanelEl.style.display = 'none';
+      }
+    });
 
     function makeLine(points, color=0x2f7fbf, opacity=0.35) {
       const geom = new THREE.BufferGeometry().setFromPoints(points);
@@ -820,6 +948,7 @@
         ${panelHtml(row)}
         <img src="${deriveThumbUrl(row)}" alt="${title}">
       `;
+      helpPanelEl.style.display = 'none';
     }
 
     function hidePanel(row) {
@@ -976,7 +1105,7 @@
 
     function isUIEvent(event) {
       return event.target.closest(
-        '#panel, #listSidebar, #listToggle, #overlay, #status, #zoomPanel'
+        '#panel, #listSidebar, #listToggle, #overlay, #status, #zoomPanel, #helpPanel, #helpToggle'
       );
     }
 

@@ -356,6 +356,7 @@
     }
   }
   </script>
+  <script src="https://cdn.jsdelivr.net/npm/astronomy-engine@2/astronomy.browser.min.js"></script>
 </head>
 <body>
   <div id="app">
@@ -500,6 +501,16 @@
     const overlayGroup = new THREE.Group();
     scene.add(overlayGroup);
 
+    const solarGroup = new THREE.Group();
+    overlayGroup.add(solarGroup);
+
+    function clearSolarGroup() {
+      solarGroup.traverse(obj => {
+        if (obj.isCSS2DObject) obj.element.remove();
+      });
+      solarGroup.clear();
+    }
+
     const helpToggleEl = document.getElementById('helpToggle');
     const helpPanelEl  = document.getElementById('helpPanel');
     const helpCloseEl  = document.getElementById('helpClose');
@@ -555,7 +566,7 @@
 
       for (let dec = decMin; dec <= decMax; dec += decStep) {
         const pts = [];
-        for (let ra = 0; ra <= 360; ra += sampleStep) {
+        for (let ra = 0; ra < 360; ra += sampleStep) {
           pts.push(radecToVec3Overlay(ra, dec));
         }
         overlayGroup.add(makeLine(pts, 0x6ee7b7, 0.22));
@@ -568,6 +579,118 @@
         label.position.copy(radecToVec3Overlay(0, dec, SKY_RADIUS + 20));
         overlayGroup.add(label);
       }
+    }
+
+    function buildAntisolarRing() {
+      const eps = THREE.MathUtils.degToRad(23.439);
+      const R = SKY_RADIUS + 4; // sit just above the RA/DEC overlay sphere
+
+      const pts = [];
+      for (let lam = 0; lam <= 361; lam++) {
+        const lamRad = THREE.MathUtils.degToRad(lam);
+        const ra  = Math.atan2(Math.sin(lamRad) * Math.cos(eps), Math.cos(lamRad));
+        const dec = Math.asin(Math.sin(eps) * Math.sin(lamRad));
+        pts.push(radecToVec3Overlay(
+          THREE.MathUtils.radToDeg(ra),
+          THREE.MathUtils.radToDeg(dec),
+          R
+        ));
+      }
+      overlayGroup.add(makeLine(pts, 0xffaa00, 0.55));
+
+      const months = ['Jan','Feb','Mar','Apr','May','Jun',
+                      'Jul','Aug','Sep','Oct','Nov','Dec'];
+
+      months.forEach((name, i) => {
+        const { ra: aRa, dec: aDec } = antiSolarRaDec(new Date(2000, i, 15));
+
+        // Tick mark on the ring
+        const tickInner = radecToVec3Overlay(aRa, aDec, R - 3);
+        const tickOuter = radecToVec3Overlay(aRa, aDec, R + 7);
+        overlayGroup.add(makeLine([tickInner, tickOuter], 0xffaa00, 0.75));
+
+        // Text label slightly outside the tick
+        const labelEl = document.createElement('div');
+        labelEl.className = 'label';
+        labelEl.textContent = name;
+        labelEl.style.color = '#ffcc66';
+        labelEl.style.fontSize = '11px';
+        const label = new CSS2DObject(labelEl);
+        label.position.copy(radecToVec3Overlay(aRa, aDec, R + 20));
+        overlayGroup.add(label);
+      });
+    }
+
+    function buildSolarSystemObjects() {
+
+      clearSolarGroup();
+
+      const now = new Date();
+      const R   = SKY_RADIUS + 6;
+
+      const { ra: nowRa, dec: nowDec } = antiSolarRaDec(); // uses current Date
+      const dotEl = document.createElement('div');
+      dotEl.className = 'label';
+      dotEl.textContent = 'Opposition';
+      dotEl.style.color = '#ff6600';
+      dotEl.style.fontSize = '11px';
+      const dotLabel = new CSS2DObject(dotEl);
+      dotLabel.position.copy(radecToVec3Overlay(nowRa, nowDec, R));
+      solarGroup.add(dotLabel);
+
+      const observer = new Astronomy.Observer(0, 0, 0);
+
+      const bodies = [
+        { label: '☀', name: 'Sun',     color: '#ffe566', dotSize: 20 },
+        { label: '☽', name: 'Moon',    color: '#dddddd', dotSize: 20  },
+        { label: '♀', name: 'Venus',   color: '#ffffee', dotSize: 12  },
+        { label: '♂', name: 'Mars',    color: '#ff6644', dotSize: 12  },
+        { label: '♃', name: 'Jupiter', color: '#ffdd88', dotSize: 16  },
+        { label: '♄', name: 'Saturn',  color: '#e8d08a', dotSize: 14  },
+        { label: '☿', name: 'Mercury', color: '#aaaaaa', dotSize: 10  },
+        { label: '⛢', name: 'Uranus',  color: '#88ffee', dotSize: 10  },
+        { label: '♆', name: 'Neptune', color: '#6688ff', dotSize: 10  },
+      ];
+
+      // null observer = geocentric equatorial (J2000), matching your RA/DEC grid
+      bodies.forEach(({ label, name, color, dotSize }) => {
+        let raDeg, decDeg;
+        try {
+          const eq = Astronomy.Equator(name, now, observer, true, true);
+          raDeg  = eq.ra * 15;  // library returns hours → convert to degrees
+          decDeg = eq.dec;
+        } catch (e) {
+          console.warn(`astronomy-engine: couldn't compute ${name}`, e);
+          return;
+        }
+
+        const pos = radecToVec3Overlay(raDeg, decDeg, R);
+
+        // Glowing dot
+        const dotEl = document.createElement('div');
+        dotEl.style.cssText = `
+          width: ${dotSize}px; height: ${dotSize}px;
+          border-radius: 50%;
+          background: ${color};
+          box-shadow: 0 0 ${dotSize * 2}px ${color};
+          pointer-events: none;
+          transform: translate(-50%, -50%);
+        `;
+        const dotObj = new CSS2DObject(dotEl);
+        dotObj.position.copy(pos);
+        solarGroup.add(dotObj);
+
+        // Text label slightly offset
+        const labelEl = document.createElement('div');
+        labelEl.className = 'label';
+        labelEl.textContent = `${name}`;
+        labelEl.style.color = color;
+        labelEl.style.fontSize = '11px';
+        const labelObj = new CSS2DObject(labelEl);
+        console.log(camera.fov)
+        labelObj.position.copy(radecToVec3Overlay(raDeg, decDeg-0.75*camera.fov/50, R)); //TODO this neeeds to cahnge with zom
+        solarGroup.add(labelObj);
+      });
     }
 
     const skyGeo = new THREE.SphereGeometry(1000, 64, 32);
@@ -1227,6 +1350,7 @@
       event.preventDefault();
       const zoomFactor = event.deltaY > 0 ? 1.08 : 0.92;
       camera.fov = THREE.MathUtils.clamp(camera.fov * zoomFactor, 1, 100);
+      buildSolarSystemObjects();
       camera.updateProjectionMatrix();
       controls.rotateSpeed = THREE.MathUtils.clamp(camera.fov / 50 * -0.35, -0.75, -0.001);
     }
@@ -1259,7 +1383,11 @@
       renderer.render(scene, camera);
       labelRenderer.render(scene, camera);
     }
+
     buildRaDecOverlay();
+    buildAntisolarRing();
+    buildSolarSystemObjects();
+    setInterval(buildSolarSystemObjects, 15 * 60 * 1000);
     reloadCatalog();
     animate();
   </script>

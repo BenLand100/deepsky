@@ -461,6 +461,7 @@
 
       return { ra, dec };
     }
+
     const { ra, dec } = antiSolarRaDec();
     const patchDir  = radecToVec3(ra, dec+45, 1).normalize();
     camera.position.copy(patchDir.clone().negate().multiplyScalar(0.1));
@@ -566,18 +567,19 @@
 
       for (let dec = decMin; dec <= decMax; dec += decStep) {
         const pts = [];
-        for (let ra = 0; ra < 360; ra += sampleStep) {
+        for (let ra = 0; ra <= 360; ra += sampleStep) {
           pts.push(radecToVec3Overlay(ra, dec));
         }
         overlayGroup.add(makeLine(pts, 0x6ee7b7, 0.22));
-
-        const labelEl = document.createElement('div');
-        labelEl.className = 'label';
-        labelEl.textContent = `${dec > 0 ? '+' : ''}${dec}°`;
-        labelEl.style.color = '#9af0cc';
-        const label = new CSS2DObject(labelEl);
-        label.position.copy(radecToVec3Overlay(0, dec, SKY_RADIUS + 20));
-        overlayGroup.add(label);
+        if (dec != 0) {
+          const labelEl = document.createElement('div');
+          labelEl.className = 'label';
+          labelEl.textContent = `${dec > 0 ? '+' : ''}${dec}°`;
+          labelEl.style.color = '#9af0cc';
+          const label = new CSS2DObject(labelEl);
+          label.position.copy(radecToVec3Overlay(0, dec, SKY_RADIUS + 20));
+          overlayGroup.add(label);
+        }
       }
     }
 
@@ -641,12 +643,12 @@
       const observer = new Astronomy.Observer(0, 0, 0);
 
       const bodies = [
-        { label: '☀', name: 'Sun',     color: '#ffe566', dotSize: 20 },
+        { label: '☀', name: 'Sun',     color: '#ffe566', dotSize: 20  },
         { label: '☽', name: 'Moon',    color: '#dddddd', dotSize: 20  },
         { label: '♀', name: 'Venus',   color: '#ffffee', dotSize: 12  },
         { label: '♂', name: 'Mars',    color: '#ff6644', dotSize: 12  },
-        { label: '♃', name: 'Jupiter', color: '#ffdd88', dotSize: 16  },
-        { label: '♄', name: 'Saturn',  color: '#e8d08a', dotSize: 14  },
+        { label: '♃', name: 'Jupiter', color: '#ffdd88', dotSize: 14  },
+        { label: '♄', name: 'Saturn',  color: '#e8d08a', dotSize: 12  },
         { label: '☿', name: 'Mercury', color: '#aaaaaa', dotSize: 10  },
         { label: '⛢', name: 'Uranus',  color: '#88ffee', dotSize: 10  },
         { label: '♆', name: 'Neptune', color: '#6688ff', dotSize: 10  },
@@ -687,7 +689,6 @@
         labelEl.style.color = color;
         labelEl.style.fontSize = '11px';
         const labelObj = new CSS2DObject(labelEl);
-        console.log(camera.fov)
         labelObj.position.copy(radecToVec3Overlay(raDeg, decDeg-0.75*camera.fov/50, R)); //TODO this neeeds to cahnge with zom
         solarGroup.add(labelObj);
       });

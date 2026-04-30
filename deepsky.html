@@ -45,7 +45,11 @@
       z-index: 2000;
     }
 
-    #overlay h2 { margin: 0 0 8px; margin-right: auto; font-size: 24px; }
+    #overlay h2 {
+      margin: 0 0 8px;
+      font-size: 24px;
+      width: 33vw;
+    }
 
     #overlayBackdrop {
       position: absolute;
@@ -56,7 +60,7 @@
 
     #overlayContent {
       position: absolute;
-      inset: 24px;
+      inset: 4px;
       display: grid;
       grid-template-rows: auto 1fr auto;
       gap: 12px;
@@ -71,13 +75,22 @@
       background: rgba(0,0,0,.72);
       border: 1px solid rgba(255,255,255,.14);
       border-radius: 12px;
-      padding: 14px;
+      padding: 6px 12px 12px 12px;
       color: #eee;
       pointer-events: auto;
     }
 
     #overlayClose {
-      z-index: 2000;
+      background: rgba(50,0,0,.7);
+      width: 50px;
+      margin-left: auto;
+    }
+    #zoomForward {
+      background: rgba(0,0,50,.7);
+    }
+    #zoomBack {
+      background: rgba(0,0,50,.7);
+      margin-left: auto;  /* pushes it to the far right of the flex row */
     }
 
     .zoom-wrap {
@@ -112,19 +125,38 @@
       display: flex;
       gap: 8px;
       align-items: center;
-      margin: 0 0 0;
+      margin: 0 0 4px;
     }
     .zoom-toolbar button {
-      background: #222;
+      background: rgba(0,0,0,.7);
       color: #eee;
       border: 1px solid rgba(255,255,255,.15);
       border-radius: 8px;
-      padding: 6px 10px;
+      padding: 6px 12px;
+      font-size: 13px;
+      font-family: system-ui, sans-serif;
+      font-weight: bold;
+      cursor: pointer;
+      backdrop-filter: blur(10px);
+      transition: background 0.15s, color 0.15s;
+    }
+    .zoom-toolbar button:hover {
+      background: rgba(255,255,255,.12);
     }
     .zoom-hint {
       font-size: 12px;
       color: #aaa;
       margin-top: 6px;
+    }
+
+    #zoomReset, #zoomOut, #zoomIn {
+      border-radius: 50%;
+      width: 32px;
+      height: 32px;
+      padding: 0;
+      text-align: center;
+      font-size: 18px;
+      line-height: 1;
     }
 
     .label { color: #fff; font: 12px/1.2 system-ui, sans-serif; text-shadow: 0 0 8px rgba(0,0,0,.95); white-space: nowrap; pointer-events: none; }
@@ -336,16 +368,28 @@
     #helpPanel li { margin-bottom: 4px; }
 
     #helpClose {
-      float: right;
-      background: none;
-      border: none;
-      color: #aaa;
-      font-size: 16px;
+      background: rgba(50,0,0,.7);
+      color: #eee;
+      border: 1px solid rgba(255,255,255,.15);
+      border-radius: 8px;
+      padding: 6px 10px;
+      font-size: 13px;
+      font-family: system-ui, sans-serif;
+      font-weight: bold;
       cursor: pointer;
-      padding: 0 0 4px 8px;
+      backdrop-filter: blur(10px);
+      transition: background 0.15s, color 0.15s;
+      float: right;
     }
 
     #helpClose:hover { color: #eee; }
+
+    @media (max-width: 600px) {
+      #panel, #zoomPanel, #listSidebar, #listToggle, #copyright {
+        display: none !important;
+      }
+      #status { display: none !important; }
+    }
 
   </style>
   <script type="importmap">
@@ -372,7 +416,7 @@
     </div>
     <button id="helpToggle">?</button>
     <div id="helpPanel">
-      <button id="helpClose">✕</button>
+      <button id="helpClose">X</button>
       <h2>Ben's Deep Sky</h2>
       <p>
         Welcome to an interactive 3D presentation of my astrophotography placed at true scale against the night sky.
@@ -519,10 +563,12 @@
     helpToggleEl.onclick = () => {
       const open = helpPanelEl.style.display === 'block';
       helpPanelEl.style.display = open ? 'none' : 'block';
+      helpToggleEl.style.background = open ? 'rgba(0,0,0,.7)' : 'rgba(50,0,0,.7)';
     };
 
     helpCloseEl.onclick = () => {
       helpPanelEl.style.display = 'none';
+      helpToggleEl.style.background ='rgba(0,0,0,.7)';
     };
 
     // Close if user clicks anywhere outside the panel or toggle button
@@ -802,11 +848,11 @@
       const item = document.createElement('div');
       item.addEventListener('mouseenter', () => {
         console.log('Entered!');
-        listHovering = true;
+        freezeCycle = true;
         showPanel(row);
       });
       item.addEventListener('mouseleave', () => {
-        listHovering = false;
+        freezeCycle = false;
         hidePanel();
       });
       item.className = 'list-item';
@@ -902,6 +948,7 @@
       if (!fully_loaded) return;
       const open = listSidebarEl.style.display === 'flex';
       listSidebarEl.style.display = open ? 'none' : 'flex';
+      listToggleEl.style.background = open ? 'rgba(0,0,0,.7)' : 'rgba(50,0,0,.7)';
       if (!open && !sidebarBuilt) {
         buildSidebar();
         sidebarBuilt = true;
@@ -1107,16 +1154,19 @@
       panelEl.innerHTML = '';
     }
 
-    function expandedView(row) {
+    function expandedView(force_row = null) {
+      const row = force_row ? force_row : getHoveredRow();
       overlayEl.style.display = 'block';
       overlayContentEl.innerHTML = `
         <div id="overlayWindow">
           <div class="zoom-toolbar">
             <h2>${rowTitle(row)}</h2>
-            <button id="zoomReset">Reset</button>
+            <button id="zoomReset">🏠</button>
             <button id="zoomOut">-</button>
             <button id="zoomIn">+</button>
-            <button id="overlayClose">Close</button>
+            <button id="zoomBack">\<\<</button>
+            <button id="zoomForward">\>\></button>
+            <button id="overlayClose">X</button>
           </div>
           <div class="zoom-wrap" id="zoomWrap">
             <div id="zoomPanel">
@@ -1132,6 +1182,16 @@
 
       overlayContentEl.querySelector('#overlayClose').onclick = () => {
         overlayEl.style.display = 'none';
+      };
+
+      overlayContentEl.querySelector('#zoomForward').onclick = () => {
+        cycleUp();
+        expandedView();
+      };
+
+      overlayContentEl.querySelector('#zoomBack').onclick = () => {
+        cycleUp();
+        expandedView();
       };
 
       const wrap = overlayEl.querySelector('#zoomWrap');
@@ -1220,11 +1280,11 @@
       }
     }
 
-    let listHovering = false;
+    let freezeCycle = false;
     let hoveredMeshes = [], cycleIndex = 0;
 
     function refreshHoverPromotion() {
-      if (listHovering) return;
+      if (freezeCycle) return;
 
       clickable.forEach(m => {
         m.scale.setScalar(1.0);
@@ -1235,7 +1295,7 @@
         return;
       }
 
-      const index = cycleIndex % (hoveredMeshes.length + 1)
+      const index = cycleIndex % (hoveredMeshes.length + 1);
       if (index > 0) {
         showPanel(hoveredMeshes[index-1].object.userData);
         hoveredMeshes[index-1].object.scale.setScalar(0.75);
@@ -1244,8 +1304,31 @@
       }
     }
 
+    function getHoveredRow() {
+      const index = cycleIndex % (hoveredMeshes.length + 1);
+      if (index > 0) {
+        return hoveredMeshes[index-1].object.userData;
+      } else {
+        return hoveredMeshes[hoveredMeshes.length-1].object.userData;
+      }
+    }
+
+    function cycleUp() {
+      cycleIndex = (cycleIndex + 1) % (hoveredMeshes.length+1);
+      if (cycleIndex == 0) {
+        cycleIndex = 1;
+      }
+    }
+
+    function cycleDown() {
+      cycleIndex = (cycleIndex - 1) % (hoveredMeshes.length+1);
+      if (cycleIndex == 0) {
+        cycleIndex = hoveredMeshes.length;
+      }
+    }
+
     setInterval(() => {
-      if (hoveredMeshes.length < 1) return;
+      if (freezeCycle || hoveredMeshes.length < 1) return;
       cycleIndex = (cycleIndex + 1) % (hoveredMeshes.length+1);
       refreshHoverPromotion();
     }, 1500);
@@ -1285,6 +1368,7 @@
         const sizeB = parseFloat(b.object.userData.extent_width_deg || 0) * parseFloat(b.object.userData.extent_height_deg || 0);
         return sizeB - sizeA;
       });
+      freezeCycle = false;
       hoveredMeshes = unsortMeshes;
 
       refreshHoverPromotion();
@@ -1293,11 +1377,8 @@
     function onClick(event) {
       if (isUIEvent(event)) return;
       if (didDrag) return;
-      raycaster.setFromCamera(pointer, camera);
-      const hits = raycaster.intersectObjects(clickable.filter(m => m.visible), false);
-      if (!hits.length) return;
-      hoveredMeshes = [];
-      expandedView(hits[0].object.userData);
+      if (!hoveredMeshes.length) return;
+      expandedView();
     }
 
     async function reloadCatalog() {

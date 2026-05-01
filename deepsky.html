@@ -36,7 +36,7 @@
     #panel dl { margin: 10px 0 0; display: grid; grid-template-columns: max-content 1fr; gap: 6px 10px; font-size: 13px; }
     #panel dt { color: #aaa; }
     #zoomPanel { position: absolute; top: 12px; right: 12px; width: min(380px, calc(100vw - 24px)); max-height: calc(100vh - 24px); overflow: auto; padding: 14px; background: rgba(0,0,0,.7); border: 1px solid rgba(255,255,255,.12); border-radius: 12px; backdrop-filter: blur(10px); pointer-events: auto; z-index: 1000; }
-    #zoomPanel dl { margin: 10px 0 0; display: grid; grid-template-columns: max-content 1fr; gap: 6px 10px; font-size: 13px; }
+    #zoomPanel dl { margin: 0; display: grid; grid-template-columns: max-content 1fr; gap: 6px 10px; font-size: 13px; }
     #zoomPanel dt { color: #aaa; }
 
     #overlay {
@@ -61,17 +61,15 @@
     #overlayContent {
       position: absolute;
       inset: 4px;
-      display: grid;
-      grid-template-rows: auto 1fr auto;
-      gap: 12px;
       pointer-events: auto;
     }
 
     #overlayWindow {
+      display: grid;
+      grid-template-rows: auto 1fr auto;
       position: relative;
-      max-width: 100%;
-      margin: 0 auto;
-      width: 98%;
+      height: 100%;
+      box-sizing: border-box;
       background: rgba(0,0,0,.72);
       border: 1px solid rgba(255,255,255,.14);
       border-radius: 12px;
@@ -96,7 +94,8 @@
     .zoom-wrap {
       position: relative;
       width: 100%;
-      height: 85vh;
+      height: 100%;
+      min-height: 0;
       overflow: hidden;
       border-radius: 8px;
       background: #111;
@@ -149,7 +148,7 @@
       margin-top: 6px;
     }
 
-    #zoomReset, #zoomOut, #zoomIn {
+    #zoomInfo, #zoomReset, #zoomOut, #zoomIn {
       border-radius: 50%;
       width: 32px;
       height: 32px;
@@ -1161,6 +1160,7 @@
         <div id="overlayWindow">
           <div class="zoom-toolbar">
             <h2>${rowTitle(row)}</h2>
+            <button id="zoomInfo">\u24D8</button>
             <button id="zoomReset">🏠</button>
             <button id="zoomOut">-</button>
             <button id="zoomIn">+</button>
@@ -1192,6 +1192,13 @@
       overlayContentEl.querySelector('#zoomBack').onclick = () => {
         cycleUp();
         expandedView();
+      };
+
+      overlayContentEl.querySelector('#zoomInfo').onclick = () => {
+        const zoomPanelEl = overlayContentEl.querySelector('#zoomPanel')
+        const open = zoomPanelEl.style.display == '';
+        console.log(zoomPanelEl.style.display);
+        zoomPanelEl.style.display = open ? 'none' : '';
       };
 
       const wrap = overlayEl.querySelector('#zoomWrap');
@@ -1349,6 +1356,17 @@
       didDrag = false;
     }
 
+    function handleHoveredMeshes() {
+      raycaster.setFromCamera(pointer, camera);
+      let unsortMeshes = raycaster.intersectObjects(clickable.filter(m => m.visible), false);
+      unsortMeshes.sort((a, b) => {
+        const sizeA = parseFloat(a.object.userData.extent_width_deg || 0) * parseFloat(a.object.userData.extent_height_deg || 0);
+        const sizeB = parseFloat(b.object.userData.extent_width_deg || 0) * parseFloat(b.object.userData.extent_height_deg || 0);
+        return sizeB - sizeA;
+      });
+      hoveredMeshes = unsortMeshes;
+    }
+
     function onPointerMove(event) {
       const dx = event.clientX - pressX;
       const dy = event.clientY - pressY;
@@ -1361,15 +1379,8 @@
       pointer.x = (event.clientX / window.innerWidth) * 2 - 1;
       pointer.y = -(event.clientY / window.innerHeight) * 2 + 1;
 
-      raycaster.setFromCamera(pointer, camera);
-      let unsortMeshes = raycaster.intersectObjects(clickable.filter(m => m.visible), false);
-      unsortMeshes.sort((a, b) => {
-        const sizeA = parseFloat(a.object.userData.extent_width_deg || 0) * parseFloat(a.object.userData.extent_height_deg || 0);
-        const sizeB = parseFloat(b.object.userData.extent_width_deg || 0) * parseFloat(b.object.userData.extent_height_deg || 0);
-        return sizeB - sizeA;
-      });
+      handleHoveredMeshes();
       freezeCycle = false;
-      hoveredMeshes = unsortMeshes;
 
       refreshHoverPromotion();
     }
@@ -1377,6 +1388,7 @@
     function onClick(event) {
       if (isUIEvent(event)) return;
       if (didDrag) return;
+      if (!hoveredMeshes.length) handleHoveredMeshes();
       if (!hoveredMeshes.length) return;
       expandedView();
     }

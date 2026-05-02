@@ -384,7 +384,7 @@
     #helpClose:hover { color: #eee; }
 
     @media (max-width: 600px) {
-      #panel, #zoomPanel, #listSidebar, #listToggle, #copyright {
+      #panel, #zoomInfo, #zoomPanel, #listSidebar, #listToggle, #copyright {
         display: none !important;
       }
       #status { display: none !important; }
@@ -1196,8 +1196,7 @@
 
       overlayContentEl.querySelector('#zoomInfo').onclick = () => {
         const zoomPanelEl = overlayContentEl.querySelector('#zoomPanel')
-        const open = zoomPanelEl.style.display == '';
-        console.log(zoomPanelEl.style.display);
+        const open = zoomPanelEl.style.display != 'none';
         zoomPanelEl.style.display = open ? 'none' : '';
       };
 

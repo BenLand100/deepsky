@@ -30,7 +30,23 @@
     #hud { position: absolute; inset: 0; pointer-events: none; }
     #status { position: absolute; left: 12px; bottom: 12px; max-width: 520px; padding: 8px 10px; background: rgba(0,0,0,.5); border: 1px solid rgba(255,255,255,.12); border-radius: 10px; font-size: 13px; pointer-events: auto; z-index: 20; }
     #copyright { position: absolute; right: 60px; bottom: 12px; max-width: 520px; padding: 8px 10px; background: rgba(0,0,0,.5); border: 1px solid rgba(255,255,255,.12); border-radius: 10px; font-size: 13px; pointer-events: auto; z-index: 20; }
-    #panel { position: absolute; top: 12px; right: 12px; width: min(380px, calc(100vw - 24px)); max-height: calc(100vh - 24px); overflow: auto; padding: 14px; background: rgba(0,0,0,.7); border: 1px solid rgba(255,255,255,.12); border-radius: 12px; backdrop-filter: blur(10px); display: none; pointer-events: auto; z-index: 1000; }
+    #panel {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      width: min(380px, calc(100vw - 24px));
+      max-height: calc(100vh - 66px);
+      overflow: auto;
+      padding: 14px;
+      background: rgba(0,0,0,.7);
+      border: 1px solid rgba(255,255,255,.12);
+      border-radius: 12px;
+      backdrop-filter: blur(10px);
+      display: none;
+      pointer-events: auto;
+      z-index: 1000;
+      box-sizing: border-box;
+    }
     #panel img { width: 100%; height: auto; display: block; margin-top: 10px; border-radius: 8px; background: #111; }
     #panel h2 { margin: 0 0 8px; font-size: 18px; }
     #panel dl { margin: 10px 0 0; display: grid; grid-template-columns: max-content 1fr; gap: 6px 10px; font-size: 13px; }
@@ -40,6 +56,7 @@
     #zoomPanel dt { color: #aaa; }
 
     #overlay {
+      box-sizing: border-box;
       position: fixed;
       inset: 0;
       z-index: 2000;
@@ -48,7 +65,11 @@
     #overlay h2 {
       margin: 0 0 8px;
       font-size: 24px;
-      width: 33vw;
+      width: auto;
+      max-width: calc(100vw - 180px);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
 
     #overlayBackdrop {
@@ -143,9 +164,12 @@
       background: rgba(255,255,255,.12);
     }
     .zoom-hint {
+      position: absolute;
       font-size: 12px;
       color: #aaa;
-      margin-top: 6px;
+      bottom: 16px;
+      left: 18px;
+      width: 100%;
     }
 
     #zoomInfo, #zoomReset, #zoomOut, #zoomIn {
@@ -330,8 +354,8 @@
       position: absolute;
       bottom: 54px;
       right: 12px;
-      width: min(340px, calc(100vw - 24px));
-      max-height: calc(100vh - 80px);
+      width: min(340px, calc(100vw - 30px));
+      max-height: calc(100vh - 66px);
       overflow-y: auto;
       background: rgba(0,0,0,.80);
       border: 1px solid rgba(255,255,255,.12);
@@ -384,10 +408,11 @@
     #helpClose:hover { color: #eee; }
 
     @media (max-width: 600px) {
-      #panel, #zoomInfo, #zoomPanel, #listSidebar, #listToggle, #copyright {
+      #panel, #zoomInfo,  #zoomReset, #zoomOut, #zoomIn, #zoomPanel, #listSidebar, #listToggle, #copyright {
         display: none !important;
       }
       #status { display: none !important; }
+      .zoom-hint { display: none !important; }
     }
 
   </style>
@@ -1176,19 +1201,19 @@
               <img src="${deriveImageUrl(row)}" alt="${basename(row.file)}">
             </div>
           </div>
-          <div class="zoom-hint">Wheel to zoom, drag to pan, double-click to reset.</div>
+          <div class="zoom-hint">Pinch, drag, wheel, double-click.</div>
         </div>
       `;
 
       overlayContentEl.querySelector('#overlayClose').onclick = () => {
         overlayEl.style.display = 'none';
       };
-
+      overlayContentEl.querySelector('#zoomForward').style.display = force_row || hoveredMeshes.length == 0 ? 'none' : '';
       overlayContentEl.querySelector('#zoomForward').onclick = () => {
         cycleUp();
         expandedView();
       };
-
+      overlayContentEl.querySelector('#zoomBack').style.display = force_row || hoveredMeshes.length == 0 ? 'none' : '';
       overlayContentEl.querySelector('#zoomBack').onclick = () => {
         cycleDown();
         expandedView();
@@ -1231,32 +1256,103 @@
         apply();
       };
 
+      // ── Zoom-view pointer/pinch handler ──────────────────────────────────
+      const zoomPointers = new Map(); // pointerId → {x, y}
+      let pinchStartDist = null;
+      let pinchStartScale = 1;
+      // midpoint at pinch start in wrap-relative coords
+      let pinchMidClientX = 0, pinchMidClientY = 0;
+
+      function zoomViewPinchDist() {
+        const pts = [...zoomPointers.values()];
+        const dx = pts[0].x - pts[1].x;
+        const dy = pts[0].y - pts[1].y;
+        return Math.hypot(dx, dy);
+      }
+
       stage.addEventListener('pointerdown', e => {
-        dragging = true;
-        stage.classList.add('dragging');
+        zoomPointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
         stage.setPointerCapture(e.pointerId);
-        sx = e.clientX;
-        sy = e.clientY;
-        startX = x;
-        startY = y;
+
+        if (zoomPointers.size === 2) {
+          // Begin pinch: snapshot current state
+          dragging = false;
+          stage.classList.remove('dragging');
+          const pts = [...zoomPointers.values()];
+          pinchStartDist = zoomViewPinchDist();
+          pinchStartScale = scale;
+          pinchMidClientX = (pts[0].x + pts[1].x) / 2;
+          pinchMidClientY = (pts[0].y + pts[1].y) / 2;
+          // Snapshot translate so we can zoom about the midpoint
+          sx = pinchMidClientX; sy = pinchMidClientY;
+          startX = x; startY = y;
+        } else if (zoomPointers.size === 1) {
+          // Single-finger drag
+          dragging = true;
+          stage.classList.add('dragging');
+          sx = e.clientX;
+          sy = e.clientY;
+          startX = x;
+          startY = y;
+        }
       });
 
       stage.addEventListener('pointermove', e => {
-        if (!dragging) return;
-        x = startX + (e.clientX - sx);
-        y = startY + (e.clientY - sy);
-        apply();
+        if (!zoomPointers.has(e.pointerId)) return;
+        zoomPointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+        if (zoomPointers.size === 2 && pinchStartDist) {
+          const dist = zoomViewPinchDist();
+          if (pinchStartDist > 0) {
+            const factor = dist / pinchStartDist;
+            const newScale = Math.min(8, Math.max(1, pinchStartScale * factor));
+
+            // Zoom about the pinch midpoint
+            const rect = wrap.getBoundingClientRect();
+            const px = pinchMidClientX - rect.left;
+            const py = pinchMidClientY - rect.top;
+            const k = newScale / pinchStartScale;
+
+            x = px - (px - startX) * k;
+            y = py - (py - startY) * k;
+            scale = newScale;
+            apply();
+          }
+        } else if (zoomPointers.size === 1 && dragging) {
+          x = startX + (e.clientX - sx);
+          y = startY + (e.clientY - sy);
+          apply();
+        }
       });
 
       stage.addEventListener('pointerup', e => {
-        dragging = false;
-        stage.classList.remove('dragging');
+        zoomPointers.delete(e.pointerId);
         try { stage.releasePointerCapture(e.pointerId); } catch {}
+        if (zoomPointers.size < 2) {
+          pinchStartDist = null;
+        }
+        if (zoomPointers.size === 0) {
+          dragging = false;
+          stage.classList.remove('dragging');
+        } else if (zoomPointers.size === 1) {
+          // One finger lifted — resume drag from remaining finger
+          const [remaining] = zoomPointers.values();
+          dragging = true;
+          stage.classList.add('dragging');
+          sx = remaining.x;
+          sy = remaining.y;
+          startX = x;
+          startY = y;
+        }
       });
 
-      stage.addEventListener('pointercancel', () => {
-        dragging = false;
-        stage.classList.remove('dragging');
+      stage.addEventListener('pointercancel', e => {
+        zoomPointers.delete(e.pointerId);
+        if (zoomPointers.size === 0) {
+          dragging = false;
+          stage.classList.remove('dragging');
+          pinchStartDist = null;
+        }
       });
 
       wrap.addEventListener('wheel', e => {
@@ -1449,6 +1545,57 @@
     }
 
     renderer.domElement.addEventListener('wheel', onWheel, { passive: false });
+
+
+    // ── Main-view pinch-to-zoom ─────────────────────────────────────────────
+    (function () {
+      const activePointers = new Map(); // pointerId → {x, y}
+      let lastPinchDist = null;
+
+      function getPinchDist() {
+        const pts = [...activePointers.values()];
+        if (pts.length < 2) return null;
+        const dx = pts[0].x - pts[1].x;
+        const dy = pts[0].y - pts[1].y;
+        return Math.hypot(dx, dy);
+      }
+
+      renderer.domElement.addEventListener('pointerdown', e => {
+        activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+        if (activePointers.size === 2) {
+          lastPinchDist = getPinchDist();
+          // Disable OrbitControls rotation while pinching
+          controls.enabled = false;
+        }
+      });
+
+      renderer.domElement.addEventListener('pointermove', e => {
+        if (!activePointers.has(e.pointerId)) return;
+        activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+        if (activePointers.size === 2 && lastPinchDist !== null) {
+          const dist = getPinchDist();
+          if (dist > 0 && lastPinchDist > 0) {
+            const ratio = lastPinchDist / dist; // > 1 → pinch in → zoom out
+            camera.fov = THREE.MathUtils.clamp(camera.fov * ratio, 1, 100);
+            camera.updateProjectionMatrix();
+            controls.rotateSpeed = THREE.MathUtils.clamp(camera.fov / 50 * -0.35, -0.75, -0.001);
+            buildSolarSystemObjects();
+          }
+          lastPinchDist = dist;
+        }
+      });
+
+      function endPointer(e) {
+        activePointers.delete(e.pointerId);
+        if (activePointers.size < 2) {
+          lastPinchDist = null;
+          if (!flyState) controls.enabled = true;
+        }
+      }
+
+      renderer.domElement.addEventListener('pointerup', endPointer);
+      renderer.domElement.addEventListener('pointercancel', endPointer);
+    })();
 
     function animate() {
       requestAnimationFrame(animate);

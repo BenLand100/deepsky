@@ -51,7 +51,7 @@
     #panel h2 { margin: 0 0 8px; font-size: 18px; }
     #panel dl { margin: 10px 0 0; display: grid; grid-template-columns: max-content 1fr; gap: 6px 10px; font-size: 13px; }
     #panel dt { color: #aaa; }
-    #zoomPanel { position: absolute; top: 12px; right: 12px; width: min(380px, calc(100vw - 24px)); max-height: calc(100vh - 24px); overflow: auto; padding: 14px; background: rgba(0,0,0,.7); border: 1px solid rgba(255,255,255,.12); border-radius: 12px; backdrop-filter: blur(10px); pointer-events: auto; z-index: 1000; }
+    #zoomPanel { position: absolute; top: 12px; right: 12px; width: min(380px, calc(100vw - 24px)); max-height: calc(100dvh - 120px); overflow: auto; padding: 14px; background: rgba(0,0,0,.7); border: 1px solid rgba(255,255,255,.12); border-radius: 12px; backdrop-filter: blur(10px); pointer-events: auto; z-index: 1000; }
     #zoomPanel dl { margin: 0; display: grid; grid-template-columns: max-content 1fr; gap: 6px 10px; font-size: 13px; }
     #zoomPanel dt { color: #aaa; }
 
@@ -66,7 +66,7 @@
       margin: 0 0 8px;
       font-size: 24px;
       width: auto;
-      max-width: calc(100vw - 180px);
+      max-width: calc(100vw - 350px);
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
@@ -206,7 +206,7 @@
       top: 60px;
       left: 12px;
       width: min(340px, calc(100vw - 62px));
-      max-height: calc(100vh - 127px);
+      max-height: calc(100dvh - 127px);
       background: rgba(0,0,0,.75);
       border: 1px solid rgba(255,255,255,.12);
       border-radius: 12px;
@@ -355,7 +355,7 @@
       bottom: 54px;
       right: 12px;
       width: min(340px, calc(100vw - 30px));
-      max-height: calc(100vh - 66px);
+      max-height: calc(100dvh - 66px);
       overflow-y: auto;
       background: rgba(0,0,0,.80);
       border: 1px solid rgba(255,255,255,.12);
@@ -413,6 +413,8 @@
       }
       #status { display: none !important; }
       .zoom-hint { display: none !important; }
+
+      #overlay h2 { max-width: calc(100vw - 180px) !important; }
     }
 
   </style>

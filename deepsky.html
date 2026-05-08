@@ -873,11 +873,17 @@
       const row  = mesh.userData;
       const item = document.createElement('div');
       item.addEventListener('mouseenter', () => {
-        console.log('Entered!');
         freezeCycle = true;
         showPanel(row);
+        clickable.forEach(m => {
+          m.scale.setScalar(1.0);
+        });
+        mesh.scale.setScalar(0.75);
       });
       item.addEventListener('mouseleave', () => {
+        clickable.forEach(m => {
+          m.scale.setScalar(1.0);
+        });
         freezeCycle = false;
         hidePanel();
       });

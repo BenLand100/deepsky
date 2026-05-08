@@ -337,7 +337,7 @@
       bottom: 12px;
       right: 12px;
       z-index: 1001;
-      background: rgba(0,0,0,.7);
+      background: rgba(50,0,0,.7);
       color: #eee;
       border: 1px solid rgba(255,255,255,.15);
       border-radius: 50%;
@@ -601,6 +601,7 @@
     document.addEventListener('mousedown', (e) => {
       if (!helpPanelEl.contains(e.target) && e.target !== helpToggleEl) {
         helpPanelEl.style.display = 'none';
+        helpToggleEl.style.background = 'rgba(0,0,0,.7)';
       }
     });
 
@@ -1179,6 +1180,7 @@
         <img src="${deriveThumbUrl(row)}" alt="${title}">
       `;
       helpPanelEl.style.display = 'none';
+      helpToggleEl.style.background = 'rgba(0,0,0,.7)';
     }
 
     function hidePanel(row) {

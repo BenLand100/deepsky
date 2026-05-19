@@ -354,7 +354,7 @@
       position: absolute;
       bottom: 54px;
       right: 12px;
-      width: min(340px, calc(100vw - 30px));
+      width: min(20vw, calc(100vw - 30px));
       max-height: calc(100dvh - 66px);
       overflow-y: auto;
       background: rgba(0,0,0,.80);
@@ -1191,6 +1191,8 @@
     }
 
     function expandedView(force_row = null) {
+      freezeCycle = true;
+
       const row = force_row ? force_row : getHoveredRow();
       overlayEl.style.display = 'block';
       overlayContentEl.innerHTML = `
@@ -1428,17 +1430,21 @@
     }
 
     function cycleUp() {
+      console.log('A',freezeCycle,cycleIndex);
       cycleIndex = (cycleIndex + 1) % (hoveredMeshes.length+1);
       if (cycleIndex == 0) {
         cycleIndex = 1;
       }
+      console.log('B',freezeCycle,cycleIndex);
     }
 
     function cycleDown() {
+      console.log('C',freezeCycle,cycleIndex);
       cycleIndex = (cycleIndex - 1) % (hoveredMeshes.length+1);
       if (cycleIndex == 0) {
         cycleIndex = hoveredMeshes.length;
       }
+      console.log('D',freezeCycle,cycleIndex);
     }
 
     setInterval(() => {

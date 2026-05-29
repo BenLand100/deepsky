@@ -541,6 +541,7 @@
     const overlayEl = document.getElementById('overlay');
     const overlayContentEl = document.getElementById('overlayContent');
 
+/*** Celestial Sphere and 3D UI ***/
 
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 5000);
@@ -622,28 +623,14 @@
       solarGroup.clear();
     }
 
-    const helpToggleEl = document.getElementById('helpToggle');
-    const helpPanelEl  = document.getElementById('helpPanel');
-    const helpCloseEl  = document.getElementById('helpClose');
-
-    helpToggleEl.onclick = () => {
-      const open = helpPanelEl.style.display === 'block';
-      helpPanelEl.style.display = open ? 'none' : 'block';
-      helpToggleEl.style.background = open ? 'rgba(0,0,0,.7)' : 'rgba(50,0,0,.7)';
-    };
-
-    helpCloseEl.onclick = () => {
-      helpPanelEl.style.display = 'none';
-      helpToggleEl.style.background ='rgba(0,0,0,.7)';
-    };
-
-    // Close if user clicks anywhere outside the panel or toggle button
-    document.addEventListener('mousedown', (e) => {
-      if (!helpPanelEl.contains(e.target) && e.target !== helpToggleEl) {
-        helpPanelEl.style.display = 'none';
-        helpToggleEl.style.background = 'rgba(0,0,0,.7)';
-      }
-    });
+    const skyGeo = new THREE.SphereGeometry(1000, 64, 32);
+    const skyTex = textureLoader.load(SKY_URL);
+    skyTex.colorSpace = THREE.SRGBColorSpace;
+    skyTex.repeat.set(-1, 1);
+    skyTex.offset.set(1, 0);
+    const skyMat = new THREE.MeshBasicMaterial({ map: skyTex, side: THREE.BackSide, toneMapped: false });
+    const skyMesh = new THREE.Mesh(skyGeo, skyMat);
+    scene.add(skyMesh);
 
     function makeLine(points, color=0x2f7fbf, opacity=0.35) {
       const geom = new THREE.BufferGeometry().setFromPoints(points);
@@ -651,8 +638,54 @@
       return new THREE.Line(geom, mat);
     }
 
+    function radecToVec3(raDeg, decDeg, radius = SKY_RADIUS) {
+      const ra = THREE.MathUtils.degToRad(Number(raDeg));
+      const dec = THREE.MathUtils.degToRad(Number(decDeg));
+      return new THREE.Vector3(
+        radius * Math.cos(dec) * Math.cos(ra),
+        radius * Math.sin(dec),
+        -radius * Math.cos(dec) * Math.sin(ra)
+      );
+    }
+
     function radecToVec3Overlay(raDeg, decDeg, radius = SKY_RADIUS + 2) {
       return radecToVec3(raDeg, decDeg, radius);
+    }
+
+    function buildPatchGeometry(patchData, radius = SKY_RADIUS) {
+      const samples = patchData.samples;
+      const grid = patchData.grid;
+      const cols = grid + 1;
+      const rows = grid + 1;
+
+      const positions = [];
+      const uvs = [];
+      const indices = [];
+
+      for (const s of samples) {
+        const v = radecToVec3(s.ra_deg, s.dec_deg, radius);
+        positions.push(v.x, v.y, v.z);
+        uvs.push(s.u, s.v);
+      }
+
+      for (let y = 0; y < rows - 1; y++) {
+        for (let x = 0; x < cols - 1; x++) {
+          const a = y * cols + x;
+          const b = a + 1;
+          const c = a + cols;
+          const d = c + 1;
+          indices.push(a, c, b);
+          indices.push(b, c, d);
+        }
+      }
+
+      const geom = new THREE.BufferGeometry();
+      geom.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+      geom.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+      geom.setIndex(indices);
+      geom.computeVertexNormals();
+      geom.computeBoundingSphere();
+      return geom;
     }
 
     function buildRaDecOverlay() {
@@ -767,12 +800,11 @@
         { label: '♆', name: 'Neptune', color: '#6688ff', dotSize: 10  },
       ];
 
-      // null observer = geocentric equatorial (J2000), matching your RA/DEC grid
       bodies.forEach(({ label, name, color, dotSize }) => {
         let raDeg, decDeg;
         try {
           const eq = Astronomy.Equator(name, now, observer, true, true);
-          raDeg  = eq.ra * 15;  // library returns hours → convert to degrees
+          raDeg  = eq.ra * 15;  // library returns hours -> convert to degrees
           decDeg = eq.dec;
         } catch (e) {
           console.warn(`astronomy-engine: couldn't compute ${name}`, e);
@@ -802,19 +834,37 @@
         labelEl.style.color = color;
         labelEl.style.fontSize = '11px';
         const labelObj = new CSS2DObject(labelEl);
-        labelObj.position.copy(radecToVec3Overlay(raDeg, decDeg-0.75*camera.fov/50, R)); //TODO this neeeds to cahnge with zom
+        labelObj.position.copy(radecToVec3Overlay(raDeg, decDeg-0.75*camera.fov/50, R));
         solarGroup.add(labelObj);
       });
     }
 
-    const skyGeo = new THREE.SphereGeometry(1000, 64, 32);
-    const skyTex = textureLoader.load(SKY_URL);
-    skyTex.colorSpace = THREE.SRGBColorSpace;
-    skyTex.repeat.set(-1, 1);
-    skyTex.offset.set(1, 0);
-    const skyMat = new THREE.MeshBasicMaterial({ map: skyTex, side: THREE.BackSide, toneMapped: false });
-    const skyMesh = new THREE.Mesh(skyGeo, skyMat);
-    scene.add(skyMesh);
+/*** Help panel ***/
+
+    const helpToggleEl = document.getElementById('helpToggle');
+    const helpPanelEl  = document.getElementById('helpPanel');
+    const helpCloseEl  = document.getElementById('helpClose');
+
+    helpToggleEl.onclick = () => {
+      const open = helpPanelEl.style.display === 'block';
+      helpPanelEl.style.display = open ? 'none' : 'block';
+      helpToggleEl.style.background = open ? 'rgba(0,0,0,.7)' : 'rgba(50,0,0,.7)';
+    };
+
+    helpCloseEl.onclick = () => {
+      helpPanelEl.style.display = 'none';
+      helpToggleEl.style.background ='rgba(0,0,0,.7)';
+    };
+
+    // Close if user clicks anywhere outside the panel or toggle button
+    document.addEventListener('mousedown', (e) => {
+      if (!helpPanelEl.contains(e.target) && e.target !== helpToggleEl) {
+        helpPanelEl.style.display = 'none';
+        helpToggleEl.style.background = 'rgba(0,0,0,.7)';
+      }
+    });
+
+/*** Data loading and setup ***/
 
     function setStatus(msg) { statusEl.textContent = msg; }
     function basename(path) { return String(path).split(/[\\/]/).pop(); }
@@ -877,6 +927,8 @@
       const common = row.common_name || '';
       return catalog && common ? `${catalog} - ${common}` : (catalog || common || basename(row.file));
     }
+
+/*** List panel ***/
 
     const hiddenSet = new Set();
     const listToggleEl   = document.getElementById('listToggle');
@@ -1028,6 +1080,8 @@
       }
     };
 
+/*** Camera flying ***/
+
     let flyState = null;
 
     function flyToRow(row) {
@@ -1058,51 +1112,7 @@
       controls.enabled = false;
     }
 
-    function radecToVec3(raDeg, decDeg, radius = SKY_RADIUS) {
-      const ra = THREE.MathUtils.degToRad(Number(raDeg));
-      const dec = THREE.MathUtils.degToRad(Number(decDeg));
-      return new THREE.Vector3(
-        radius * Math.cos(dec) * Math.cos(ra),
-        radius * Math.sin(dec),
-        -radius * Math.cos(dec) * Math.sin(ra)
-      );
-    }
-
-    function buildPatchGeometry(patchData, radius = SKY_RADIUS) {
-      const samples = patchData.samples;
-      const grid = patchData.grid;
-      const cols = grid + 1;
-      const rows = grid + 1;
-
-      const positions = [];
-      const uvs = [];
-      const indices = [];
-
-      for (const s of samples) {
-        const v = radecToVec3(s.ra_deg, s.dec_deg, radius);
-        positions.push(v.x, v.y, v.z);
-        uvs.push(s.u, s.v);
-      }
-
-      for (let y = 0; y < rows - 1; y++) {
-        for (let x = 0; x < cols - 1; x++) {
-          const a = y * cols + x;
-          const b = a + 1;
-          const c = a + cols;
-          const d = c + 1;
-          indices.push(a, c, b);
-          indices.push(b, c, d);
-        }
-      }
-
-      const geom = new THREE.BufferGeometry();
-      geom.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-      geom.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
-      geom.setIndex(indices);
-      geom.computeVertexNormals();
-      geom.computeBoundingSphere();
-      return geom;
-    }
+/*** Image patches ***/
 
     function clearPatches() {
       clickable.length = 0;

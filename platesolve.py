@@ -52,9 +52,7 @@ def iter_images(folder: Path, recursive=False):
     else:
         yield from (p for p in folder.iterdir() if p.is_file() and p.suffix.lower() in IMAGE_EXTS)
 
-
-def read_input_paths(input_arg: str, recursive=False):
-    p = Path(input_arg)
+def read_input_path(p: Path, recursive=False):
     if p.is_dir():
         return sorted(iter_images(p, recursive=recursive))
     if p.is_file() and p.suffix.lower() == ".csv":
@@ -66,8 +64,15 @@ def read_input_paths(input_arg: str, recursive=False):
                 if fp:
                     files.append(Path(fp))
         return files
-    raise SystemExit(f"Input must be a directory or a CSV file: {input_arg}")
+    else:
+        return [p]
+    raise SystemExit(f"Input must be an image, directory, or a CSV file: {p}")
 
+def read_input_paths(input_arg: list[str], recursive=False):
+    imgs = []
+    for ip in input_arg:
+        imgs.extend(read_input_path(Path(ip),recursive=recursive))
+    return imgs
 
 def api_post(session, endpoint, payload, files=None, timeout=120):
     url = f"{API_BASE}/{endpoint}"
@@ -310,7 +315,7 @@ def load_reference_csv(ref_path):
 
 def main():
     ap = argparse.ArgumentParser(description="Astrometry.net API batch solver with curved patch JSON export")
-    ap.add_argument("input", help="Input directory OR CSV from a prior run")
+    ap.add_argument("input", nargs='+', help="Input directory OR images OR CSV from a prior run")
     ap.add_argument("--api-key", required=True, help="Astrometry.net API key")
     ap.add_argument("--output", default="results.csv", help="Main output CSV")
     ap.add_argument("--recursive", action="store_true", help="Recurse into subdirectories when input is a directory")

@@ -1078,6 +1078,11 @@
         buildSidebar();
         sidebarBuilt = true;
       }
+      if (!open) {
+        applyFilters();
+      } else {
+        showAllPatches();
+      }
     };
 
 /*** Camera flying ***/
@@ -1158,10 +1163,6 @@
       const labelEl = document.createElement('div');
       labelEl.className = 'label';
       labelEl.textContent = basename(row.file);
-      //const label = new CSS2DObject(labelEl);
-      //label.position.copy(radecToVec3(row.center_ra_deg, row.center_dec_deg, SKY_RADIUS + 8));
-      //patchGroup.add(label);
-      //mesh.userData._label = label;
     }
 
     function panelHtml(row) {
@@ -1440,7 +1441,6 @@
     function showAllPatches() {
       for (const mesh of clickable) {
         mesh.visible = true;
-        if (mesh.userData._label) mesh.userData._label.visible = true;
       }
     }
 

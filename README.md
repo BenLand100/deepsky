@@ -46,7 +46,9 @@ First put the images in the `image/` folder and use the `platesolve.py` script t
 ```bash
 ./platesolve.py --patch-json --keep-wcs --api-key [astrometry.net_api_key] images/2026-05-28_*
 ```
-This will create `results.csv` which can be appended to `live_images.csv` after running the `thumbs.py` script again to update thumbnails.
+This will create `results.csv` which can be appended to `live_images.csv` after running the `./thumbs.py images` script again to update thumbnails.
+You can then use your favorite csv editor to add the additional acquisition metadata to `live_images.csv`.
+
 # Credits
 
 Background image is from NASA/Goddard Space Flight Center Scientific Visualization Studio. Gaia DR2: ESA/Gaia/DPAC. Constellation figures based on those developed for the IAU by Alan MacRobert of Sky and Telescope magazine (Roger Sinnott and Rick Fienberg).

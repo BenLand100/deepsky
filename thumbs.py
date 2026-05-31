@@ -32,6 +32,7 @@ def main():
     ap.add_argument('input', help='Input image directory')
     ap.add_argument('--output-dir', default='thumbs', help='Thumbnail output directory')
     ap.add_argument('--recursive', action='store_true')
+    ap.add_argument('--reprocess', action='store_true', help='Create thumbnails where one appears to already exist, otherwise skips.')
     ap.add_argument('--max-size', type=int, default=1024, help='Max width/height in pixels, default 512')
     ap.add_argument('--quality', type=int, default=88, help='JPEG quality, default 88')
     args = ap.parse_args()
@@ -45,8 +46,12 @@ def main():
     for i, src in enumerate(files, start=1):
         rel = src.relative_to(src_dir)
         dst = out_dir / rel
-        out = make_thumb(src, dst, args.max_size, args.quality)
-        print(f'[{i}/{len(files)}] {src} -> {out}', flush=True)
+        if args.reprocess or not dst.exists():
+            out = make_thumb(src, dst, args.max_size, args.quality)
+            print(f'[{i}/{len(files)}] {src} -> {out}', flush=True)
+        else:
+            print(f'[{i}/{len(files)}] {dst} exists', flush=True)
+
 
 
 if __name__ == '__main__':

@@ -180,6 +180,7 @@
       background: rgba(50,0,0,.7);
     }
     #overlayClose:hover {
+      background: rgba(100,0,0,.7);
       font-weight: 700;
     }
     #zoomForward {
@@ -221,10 +222,6 @@
       pointer-events: auto;
       backdrop-filter: blur(10px);
       transition: background 0.15s, color 0.15s;
-    }
-    #listToggle:hover {
-      color: #eee;
-      font-weight: 700;
     }
 
     #listSidebar {
@@ -433,6 +430,7 @@
 
     #helpClose:hover {
       color: #eee;
+      background: rgba(100,0,0,.7);
       font-weight: 700;
     }
 
@@ -455,6 +453,24 @@
       #overlay h2 { max-width: calc(100vw - 180px) !important; }
     }
 
+    #copyButton {
+      position: fixed;
+      top: 13px;
+      left: 64px;
+      zIndex: 30;
+      background: rgba(0,0,0,.5);
+      border: 1px solid rgba(255,255,255,.18);
+      border-radius: 8px;
+      color: #fff;
+      padding: 10px 10px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      fontSize: 13px;
+      transition: background .15s;
+    }
+
   </style>
   <script type="importmap">
   {
@@ -473,12 +489,18 @@
       <div id="status">Loading...</div>
       <div id="copyright">Copyright 2023-2026 Benjamin J. Land</div>
     </div>
-    <button id="listToggle">☰</button>
+    <button id="listToggle" title='Toggle image list'>☰</button>
+    <button id='copyButton' title='Copy link to this view'>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16">
+        <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
+        <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
+      </svg>
+    </button>
     <div id="listSidebar">
       <div id="filterBar"><!-- dynamic filter controls --></div>
       <div id="objectList"><!-- dynamic list items --></div>
     </div>
-    <button id="helpToggle">?</button>
+    <button id="helpToggle" title='View information about this page'>?</button>
     <div id="helpPanel">
       <button id="helpClose">X</button>
       <h2>Ben's Deep Sky</h2>
@@ -513,6 +535,9 @@
       <p>
         The background image is provided by NASA/Goddard Space Flight Center
         <a href="https://svs.gsfc.nasa.gov/4851/">Scientific Visualization Studio</a>.
+        The other images are of <a href="https://ben.land/post/2025/12/30/deep-sky-images-vol-three/">my own creation</a>.
+        This page itself was created by <a href="https://ben.land/">myself</a> with some help from AI.
+        .
       </p>
     </div>
     <div id="overlay" style="display:none;">
@@ -850,10 +875,19 @@
       helpPanelEl.style.display = open ? 'none' : 'block';
       helpToggleEl.style.background = open ? 'rgba(0,0,0,.7)' : 'rgba(50,0,0,.7)';
     };
+    helpToggleEl.onmouseenter = () => {
+      const open = helpPanelEl.style.display === 'block';
+      helpToggleEl.style.background = open ? 'rgba(100,0,0,.7)' : 'rgba(255,255,255,.18)';
+    };
+    helpToggleEl.onmouseleave = () => {
+      const open = helpPanelEl.style.display === 'block';
+      helpToggleEl.style.background = open ? 'rgba(50,0,0,.7)' : 'rgba(0,0,0,.7)';
+    };
 
     helpCloseEl.onclick = () => {
       helpPanelEl.style.display = 'none';
       helpToggleEl.style.background ='rgba(0,0,0,.7)';
+      helpToggleEl.style.hover.background = 'rgba(255,255,255,.18)';
     };
 
     // Close if user clicks anywhere outside the panel or toggle button
@@ -1083,6 +1117,14 @@
       } else {
         showAllPatches();
       }
+    };
+    listToggleEl.onmouseenter = () => {
+      const open = listSidebarEl.style.display === 'flex';
+      listToggleEl.style.background = open ? 'rgba(100,0,0,.7)' : 'rgba(255,255,255,.18)';
+    };
+    listToggleEl.onmouseleave = () => {
+      const open = listSidebarEl.style.display === 'flex';
+      listToggleEl.style.background = open ? 'rgba(50,0,0,.7)' : 'rgba(0,0,0,.7)';
     };
 
 /*** Camera flying ***/
@@ -1621,6 +1663,7 @@
       buildSolarSystemObjects();
       camera.updateProjectionMatrix();
       controls.rotateSpeed = THREE.MathUtils.clamp(camera.fov / 50 * -0.35, -0.75, -0.001);
+      scheduleHashUpdate();
     }
 
     renderer.domElement.addEventListener('wheel', onWheel, { passive: false });
@@ -1694,6 +1737,7 @@
         if (flyState.t >= 1) {
           controls.enabled = true;   // OrbitControls re-syncs from camera.position on first update()
           flyState = null;
+          scheduleHashUpdate();
         }
       } else {
         controls.update();
@@ -1703,12 +1747,91 @@
       labelRenderer.render(scene, camera);
     }
 
+/*** Permalink / URL hash view state ***/
+
+    // Encode camera state as #v=theta,phi,fov  (angles in degrees, 2dp)
+    function encodeViewHash() {
+      const s = new THREE.Spherical().setFromVector3(camera.position);
+      const theta = parseFloat(THREE.MathUtils.radToDeg(s.theta).toFixed(2));
+      const phi   = parseFloat(THREE.MathUtils.radToDeg(s.phi).toFixed(2));
+      const fov   = parseFloat(camera.fov.toFixed(2));
+      return `#v=${theta},${phi},${fov}`;
+    }
+
+    // Decode hash and return {theta, phi, fov} or null
+    function decodeViewHash(hash) {
+      const m = hash.match(/[#&]v=([^&]+)/);
+      if (!m) return null;
+      const parts = m[1].split(',').map(Number);
+      if (parts.length !== 3 || parts.some(isNaN)) return null;
+      return { theta: parts[0], phi: parts[1], fov: parts[2] };
+    }
+
+    // Apply a decoded view state immediately (no animation)
+    function applyViewState(vs) {
+      const r = camera.position.length() || 0.1;
+      camera.position.setFromSphericalCoords(
+        r,
+        THREE.MathUtils.degToRad(vs.phi),
+        THREE.MathUtils.degToRad(vs.theta)
+      );
+      camera.fov = Math.min(120, Math.max(1, vs.fov));
+      camera.lookAt(0, 0, 0);
+      camera.updateProjectionMatrix();
+      controls.update();
+      controls.rotateSpeed = THREE.MathUtils.clamp(camera.fov / 50 * -0.35, -0.75, -0.001);
+    }
+
+    // Restore from hash on load
+    (function restoreFromHash() {
+      const vs = decodeViewHash(window.location.hash);
+      if (vs) applyViewState(vs);
+    })();
+
+    // Debounced hash updater: fires 1.2s after the user stops interacting
+    let _hashTimer = null;
+    function scheduleHashUpdate() {
+      if (_hashTimer) clearTimeout(_hashTimer);
+      _hashTimer = setTimeout(() => {
+        const newHash = encodeViewHash();
+        history.replaceState(null, '', newHash);
+        _hashTimer = null;
+      }, 1200);
+    }
+
+    // Update hash whenever OrbitControls moves the camera
+    controls.addEventListener('change', scheduleHashUpdate);
+
+    const btn = document.getElementById('copyButton');
+    btn.onmouseenter = () => {
+      btn.style.background = 'rgba(255,255,255,.15)';
+    };
+    btn.onmouseleave = () => {
+      btn.style.background = 'rgba(0,0,0,.5)';
+    };
+    btn.onclick = () => {
+      // Snap the hash right now (don't wait for debounce)
+      const newHash = encodeViewHash();
+      history.replaceState(null, '', newHash);
+      const url = window.location.href;
+      navigator.clipboard.writeText(url).then(() => {
+        btn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><polyline points="20 6 9 17 4 12"/></svg>\u00a0Copied!`;
+        setTimeout(() => {
+          btn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>`;
+        }, 2000);
+      }).catch(() => {
+        // Clipboard API unavailable (non-HTTPS/non-focus); show prompt fallback
+        prompt('Copy this link:', url);
+      });
+    };
+
     buildRaDecOverlay();
     buildAntisolarRing();
     buildSolarSystemObjects();
     setInterval(buildSolarSystemObjects, 15 * 60 * 1000);
     reloadCatalog();
     animate();
+
   </script>
 </body>
 </html>

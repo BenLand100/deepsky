@@ -443,16 +443,6 @@
       text-decoration: underline;
     }
 
-    @media (max-width: 600px) {
-      #panel, #zoomInfo,  #zoomReset, #zoomOut, #zoomIn, #zoomPanel, #listSidebar, #listToggle, #copyright {
-        display: none !important;
-      }
-      #status { display: none !important; }
-      .zoom-hint { display: none !important; }
-
-      #overlay h2 { max-width: calc(100vw - 180px) !important; }
-    }
-
     #copyButton {
       position: fixed;
       top: 13px;
@@ -471,6 +461,20 @@
       transition: background .15s;
     }
 
+    @media (max-width: 600px) {
+      #panel, #zoomInfo,  #zoomReset, #zoomOut, #zoomIn, #zoomPanel, #listSidebar, #listToggle, #copyright {
+        display: none !important;
+      }
+      #status { display: none !important; }
+      .zoom-hint { display: none !important; }
+
+      #copyButton {
+        left: 13px;
+      }
+
+      #overlay h2 { max-width: calc(100vw - 180px) !important; }
+    }
+
   </style>
   <script type="importmap">
   {
@@ -479,6 +483,13 @@
       "three/": "https://unpkg.com/three@0.180.0/"
     }
   }
+  </script>
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-9LH6TXZN0X"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', 'G-9LH6TXZN0X');
   </script>
   <script src="https://cdn.jsdelivr.net/npm/astronomy-engine@2/astronomy.browser.min.js"></script>
 </head>

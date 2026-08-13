@@ -71,6 +71,10 @@ def upload_file(http, session_key, file_path, upload_args):
     if upload_args.get("radius") is not None:
         payload["radius"] = float(upload_args["radius"])
         
+    for k in ["scale_type", "scale_units", "scale_lower", "scale_upper"]:
+        if upload_args.get(k) is not None:
+            payload[k] = upload_args[k]
+            
     mime = mimetypes.guess_type(file_path)[0] or "application/octet-stream"
     with open(file_path, "rb") as f:
         files = {"file": (os.path.basename(file_path), f, mime)}
@@ -186,7 +190,7 @@ def prompt(message, default=''):
     val = input(msg).strip()
     return val if val else default
 
-def solve_local(image_path, wcs_path, ra=None, dec=None, radius=None):
+def solve_local(image_path, wcs_path, ra=None, dec=None, radius=None, scale_low=None, scale_high=None, scale_units="degwidth"):
     print(f"Solving {image_path} locally with solve-field...")
     cmd = [
         "solve-field",
@@ -200,6 +204,12 @@ def solve_local(image_path, wcs_path, ra=None, dec=None, radius=None):
         cmd.extend(["--dec", str(dec)])
     if radius is not None:
         cmd.extend(["--radius", str(radius)])
+    if scale_low is not None:
+        cmd.extend(["--scale-low", str(scale_low)])
+    if scale_high is not None:
+        cmd.extend(["--scale-high", str(scale_high)])
+    if scale_low is not None or scale_high is not None:
+        cmd.extend(["--scale-units", scale_units])
         
     cmd.append(str(image_path))
     
@@ -216,7 +226,7 @@ def solve_local(image_path, wcs_path, ra=None, dec=None, radius=None):
         raise RuntimeError("solve-field failed to produce a WCS file.")
     print("Local solve-field succeeded.")
 
-def solve_api(image_path, wcs_path, api_key, ra=None, dec=None, radius=None):
+def solve_api(image_path, wcs_path, api_key, ra=None, dec=None, radius=None, scale_low=None, scale_high=None, scale_units="degwidth"):
     print(f"Solving {image_path} via astrometry.net API...")
     http = requests.Session()
     http.headers.update({"User-Agent": "astrometry-batch-curved/1.0"})
@@ -233,6 +243,13 @@ def solve_api(image_path, wcs_path, api_key, ra=None, dec=None, radius=None):
         "center_dec": dec,
         "radius": radius
     }
+    if scale_low is not None or scale_high is not None:
+        upload_args["scale_type"] = "ul"
+        upload_args["scale_units"] = scale_units
+        if scale_low is not None:
+            upload_args["scale_lower"] = scale_low
+        if scale_high is not None:
+            upload_args["scale_upper"] = scale_high
     subid = upload_file(http, session_key, str(image_path), upload_args)
     print(f"Uploaded. Submission ID: {subid}")
     time.sleep(2)
@@ -265,6 +282,9 @@ def main():
     ap.add_argument("--ra", type=str, help="Right Ascension hint in degrees (float) or HH:MM:SS / HH.MM.SS")
     ap.add_argument("--dec", type=str, help="Declination hint in degrees (float) or DD:MM:SS / DD.MM.SS")
     ap.add_argument("--radius", type=float, default=2.0, help="Search radius around RA/DEC hint in degrees (default: 2.0)")
+    ap.add_argument("--scale-low", type=float, help="Lower bound of image scale estimate")
+    ap.add_argument("--scale-high", type=float, help="Upper bound of image scale estimate")
+    ap.add_argument("--scale-units", type=str, choices=["degwidth", "arcminwidth", "arcsecperpix"], default="degwidth", help="Units for scale bounds (default: degwidth)")
     args = ap.parse_args()
     
     parsed_ra = parse_ra(args.ra)
@@ -324,14 +344,22 @@ def main():
     orientation = ""
     
     if args.api_key:
-        cal, subid, jobid = solve_api(dest_img, wcs_path, args.api_key, ra=parsed_ra, dec=parsed_dec, radius=args.radius if (parsed_ra is not None or parsed_dec is not None) else None)
+        cal, subid, jobid = solve_api(
+            dest_img, wcs_path, args.api_key,
+            ra=parsed_ra, dec=parsed_dec, radius=args.radius if (parsed_ra is not None or parsed_dec is not None) else None,
+            scale_low=args.scale_low, scale_high=args.scale_high, scale_units=args.scale_units
+        )
         center_ra = cal.get("ra", "")
         center_dec = cal.get("dec", "")
         pixscale = cal.get("pixscale", "")
         radius = cal.get("radius", "")
         orientation = cal.get("orientation", "")
     else:
-        solve_local(dest_img, wcs_path, ra=parsed_ra, dec=parsed_dec, radius=args.radius if (parsed_ra is not None or parsed_dec is not None) else None)
+        solve_local(
+            dest_img, wcs_path,
+            ra=parsed_ra, dec=parsed_dec, radius=args.radius if (parsed_ra is not None or parsed_dec is not None) else None,
+            scale_low=args.scale_low, scale_high=args.scale_high, scale_units=args.scale_units
+        )
         
     width_px, height_px = image_size(dest_img)
 

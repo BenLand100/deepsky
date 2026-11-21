@@ -5,8 +5,10 @@ import json
 import mimetypes
 import os
 import shutil
+import signal
 import subprocess
 import sys
+import tempfile
 import time
 from datetime import datetime
 from pathlib import Path
@@ -190,40 +192,58 @@ def prompt(message, default=''):
     val = input(msg).strip()
     return val if val else default
 
-def solve_local(image_path, wcs_path, ra=None, dec=None, radius=None, scale_low=None, scale_high=None, scale_units="degwidth"):
-    print(f"Solving {image_path} locally with solve-field...")
-    cmd = [
-        "solve-field",
-        "--wcs", str(wcs_path),
-        "--overwrite",
-        "--no-plots"
-    ]
-    if ra is not None:
-        cmd.extend(["--ra", str(ra)])
-    if dec is not None:
-        cmd.extend(["--dec", str(dec)])
-    if radius is not None:
-        cmd.extend(["--radius", str(radius)])
-    if scale_low is not None:
-        cmd.extend(["--scale-low", str(scale_low)])
-    if scale_high is not None:
-        cmd.extend(["--scale-high", str(scale_high)])
-    if scale_low is not None or scale_high is not None:
-        cmd.extend(["--scale-units", scale_units])
-        
-    cmd.append(str(image_path))
-    
-    # Inject system python packages to PYTHONPATH so astrometry tools can find their modules
-    # when run from inside the virtual environment.
-    env = os.environ.copy()
-    sys_paths = ["/usr/lib/python3.13/site-packages", "/usr/lib/python3/dist-packages"]
-    existing_pp = env.get("PYTHONPATH", "")
-    env["PYTHONPATH"] = ":".join(sys_paths + ([existing_pp] if existing_pp else []))
-    
-    result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, env=env)
-    if not os.path.exists(wcs_path):
-        print(result.stdout)
-        raise RuntimeError("solve-field failed to produce a WCS file.")
+def solve_local(image_path, wcs_path, ra=None, dec=None, radius=None, scale_low=None, scale_high=None, scale_units="degwidth", timeout=60.0):
+    image_path = Path(image_path).resolve()
+    wcs_path = Path(wcs_path).resolve()
+    timeout_val = timeout if (timeout is not None and timeout > 0) else None
+    print(f"Solving {image_path} locally with solve-field" + (f" (timeout: {timeout_val:g}s)..." if timeout_val else "..."))
+    with tempfile.TemporaryDirectory(prefix=".solve_field_", dir=image_path.parent) as tmp_dir:
+        cmd = [
+            "solve-field",
+            "--dir", tmp_dir,
+            "--wcs", str(wcs_path),
+            "--overwrite",
+            "--no-plots"
+        ]
+        if ra is not None:
+            cmd.extend(["--ra", str(ra)])
+        if dec is not None:
+            cmd.extend(["--dec", str(dec)])
+        if radius is not None:
+            cmd.extend(["--radius", str(radius)])
+        if scale_low is not None:
+            cmd.extend(["--scale-low", str(scale_low)])
+        if scale_high is not None:
+            cmd.extend(["--scale-high", str(scale_high)])
+        if scale_low is not None or scale_high is not None:
+            cmd.extend(["--scale-units", scale_units])
+
+        cmd.append(str(image_path))
+
+        proc = subprocess.Popen(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            start_new_session=True,
+        )
+        try:
+            stdout, _ = proc.communicate(timeout=timeout_val)
+        except subprocess.TimeoutExpired:
+            try:
+                os.killpg(proc.pid, signal.SIGTERM)
+                proc.wait(timeout=3)
+            except Exception:
+                try:
+                    os.killpg(proc.pid, signal.SIGKILL)
+                except Exception:
+                    pass
+                proc.wait()
+            raise TimeoutError(f"solve-field timed out after {timeout_val:g}s.")
+
+        if not wcs_path.exists():
+            print(stdout)
+            raise RuntimeError("solve-field failed to produce a WCS file.")
     print("Local solve-field succeeded.")
 
 def solve_api(image_path, wcs_path, api_key, ra=None, dec=None, radius=None, scale_low=None, scale_high=None, scale_units="degwidth"):
@@ -275,17 +295,48 @@ def parse_dec(val):
     except ValueError:
         return Angle(val.replace('.', ':'), unit=u.deg).deg
 
+def parse_exposure_arg(val):
+    parts = val.split(":")
+    if len(parts) != 3:
+        raise argparse.ArgumentTypeError(
+            f"Invalid --exposure '{val}': expected CHANNEL:COUNT:EXPTIME (e.g. Ha:20:300)"
+        )
+    channel, count, exptime = parts[0].strip(), parts[1].strip(), parts[2].strip()
+    valid_channels = {"OSC", "L", "R", "G", "B", "Sii", "Ha", "Oiii"}
+    channel_map = {c.lower(): c for c in valid_channels}
+    if channel.lower() not in channel_map:
+        raise argparse.ArgumentTypeError(
+            f"Invalid exposure channel '{channel}': must be one of {sorted(valid_channels)}"
+        )
+    return channel_map[channel.lower()], count, exptime
+
 def main():
     ap = argparse.ArgumentParser(description="Add a new image to DeepSky")
     ap.add_argument("image", help="Path to the image to add")
-    ap.add_argument("--api-key", help="Use astrometry.net API key instead of local solve-field")
+    ap.add_argument("--api-key", help="Astrometry.net API key (uses API only unless --api-fallback is set)")
+    ap.add_argument("--api-fallback", action="store_true", help="Try local solve-field first, falling back to astrometry.net API on failure or timeout (requires --api-key)")
+    ap.add_argument("--local-timeout", type=float, default=60.0, help="Max seconds for local solve-field before timing out (default: 60, <=0 disables)")
     ap.add_argument("--ra", type=str, help="Right Ascension hint in degrees (float) or HH:MM:SS / HH.MM.SS")
     ap.add_argument("--dec", type=str, help="Declination hint in degrees (float) or DD:MM:SS / DD.MM.SS")
     ap.add_argument("--radius", type=float, default=2.0, help="Search radius around RA/DEC hint in degrees (default: 2.0)")
     ap.add_argument("--scale-low", type=float, help="Lower bound of image scale estimate")
     ap.add_argument("--scale-high", type=float, help="Upper bound of image scale estimate")
     ap.add_argument("--scale-units", type=str, choices=["degwidth", "arcminwidth", "arcsecperpix"], default="degwidth", help="Units for scale bounds (default: degwidth)")
+    ap.add_argument("--telescope", type=str, default=None, help="Telescope name (bypasses prompt)")
+    ap.add_argument("--camera", type=str, default=None, help="Camera name (bypasses prompt)")
+    ap.add_argument("--processor", type=str, default=None, help="Processor name (bypasses prompt)")
+    ap.add_argument("--image-type", type=str, default=None, help="Image type, e.g. OSC, LRGB, SHO+RGB (bypasses prompt)")
+    ap.add_argument("--catalog-id", type=str, default=None, help="Catalog identifier, e.g. M42 (bypasses prompt)")
+    ap.add_argument("--common-name", type=str, default=None, help="Common name, e.g. Orion Nebula (bypasses prompt)")
+    ap.add_argument("--osc-filter", type=str, default=None, help="OSC filter name (optional)")
+    ap.add_argument("--exposure", action="append", type=parse_exposure_arg, default=[], help="Channel exposure as CHANNEL:COUNT:EXPTIME (repeatable, e.g. --exposure Ha:20:300)")
+    ap.add_argument("-y", "--non-interactive", action="store_true", help="Never prompt; use provided values or defaults")
+    transfer_grp = ap.add_mutually_exclusive_group()
+    transfer_grp.add_argument("--move", action="store_true", help="Move source image into images/ after updating CSV (default for images in stage/)")
+    transfer_grp.add_argument("--copy", action="store_true", help="Copy source image into images/ after updating CSV (default outside stage/)")
     args = ap.parse_args()
+    if args.api_fallback and not args.api_key:
+        ap.error("--api-fallback requires --api-key")
     
     parsed_ra = parse_ra(args.ra)
     parsed_dec = parse_dec(args.dec)
@@ -308,10 +359,6 @@ def main():
         d.mkdir(parents=True, exist_ok=True)
 
     dest_img = images_dir / src_img.name
-    if src_img.absolute() != dest_img.absolute():
-        print(f"Copying {src_img} to {dest_img}...")
-        shutil.copy2(src_img, dest_img)
-
     stem = dest_img.stem
     wcs_path = wcs_dir / f"{stem}.wcs"
     patch_path = patches_dir / f"{stem}.patch.json"
@@ -326,14 +373,33 @@ def main():
         "Telescope", "Camera", "Processor", "Image Type", "catalog_identifier", "common_name"
     ]
 
-    print("\n--- Metadata ---")
+    def resolve_meta(label, cli_val, default=''):
+        if cli_val is not None:
+            return cli_val
+        if args.non_interactive:
+            return default
+        return prompt(label, default)
+
     meta = {}
-    meta["Telescope"] = prompt("Telescope", last_meta.get("Telescope", ""))
-    meta["Camera"] = prompt("Camera", last_meta.get("Camera", ""))
-    meta["Processor"] = prompt("Processor", last_meta.get("Processor", "Siril"))
-    meta["Image Type"] = prompt("Image Type", last_meta.get("Image Type", "OSC"))
-    meta["catalog_identifier"] = prompt("Catalog Identifier (e.g. M42)")
-    meta["common_name"] = prompt("Common Name (e.g. Orion Nebula)")
+    need_prompt = (not args.non_interactive) and any(
+        v is None for v in (
+            args.telescope, args.camera, args.processor,
+            args.image_type, args.catalog_id, args.common_name
+        )
+    )
+    if need_prompt:
+        print("\n--- Metadata ---")
+    meta["Telescope"] = resolve_meta("Telescope", args.telescope, last_meta.get("Telescope", ""))
+    meta["Camera"] = resolve_meta("Camera", args.camera, last_meta.get("Camera", ""))
+    meta["Processor"] = resolve_meta("Processor", args.processor, last_meta.get("Processor", "Siril"))
+    meta["Image Type"] = resolve_meta("Image Type", args.image_type, last_meta.get("Image Type", "OSC"))
+    meta["catalog_identifier"] = resolve_meta("Catalog Identifier (e.g. M42)", args.catalog_id, "")
+    meta["common_name"] = resolve_meta("Common Name (e.g. Orion Nebula)", args.common_name, "")
+    if args.osc_filter is not None:
+        meta["OSC filter"] = args.osc_filter
+    for channel, count, exptime in args.exposure:
+        meta[f"{channel} total images"] = count
+        meta[f"{channel} exptime"] = exptime
 
     subid = ""
     jobid = ""
@@ -343,10 +409,28 @@ def main():
     radius = ""
     orientation = ""
     
-    if args.api_key:
+    solve_radius = args.radius if (parsed_ra is not None or parsed_dec is not None) else None
+    use_api = bool(args.api_key and not args.api_fallback)
+
+    if not use_api:
+        try:
+            solve_local(
+                src_img, wcs_path,
+                ra=parsed_ra, dec=parsed_dec, radius=solve_radius,
+                scale_low=args.scale_low, scale_high=args.scale_high, scale_units=args.scale_units,
+                timeout=args.local_timeout
+            )
+        except (TimeoutError, RuntimeError) as e:
+            if args.api_fallback and args.api_key:
+                print(f"Local solve failed ({e}). Falling back to astrometry.net API...")
+                use_api = True
+            else:
+                raise
+
+    if use_api:
         cal, subid, jobid = solve_api(
-            dest_img, wcs_path, args.api_key,
-            ra=parsed_ra, dec=parsed_dec, radius=args.radius if (parsed_ra is not None or parsed_dec is not None) else None,
+            src_img, wcs_path, args.api_key,
+            ra=parsed_ra, dec=parsed_dec, radius=solve_radius,
             scale_low=args.scale_low, scale_high=args.scale_high, scale_units=args.scale_units
         )
         center_ra = cal.get("ra", "")
@@ -354,14 +438,8 @@ def main():
         pixscale = cal.get("pixscale", "")
         radius = cal.get("radius", "")
         orientation = cal.get("orientation", "")
-    else:
-        solve_local(
-            dest_img, wcs_path,
-            ra=parsed_ra, dec=parsed_dec, radius=args.radius if (parsed_ra is not None or parsed_dec is not None) else None,
-            scale_low=args.scale_low, scale_high=args.scale_high, scale_units=args.scale_units
-        )
         
-    width_px, height_px = image_size(dest_img)
+    width_px, height_px = image_size(src_img)
 
     # Always extract from WCS if local, or missing
     if not (center_ra and center_dec and pixscale):
@@ -384,11 +462,11 @@ def main():
     export_patch_json(wcs_path, width_px, height_px, patch_path, grid=16)
     
     print(f"Generating thumbnail to {thumb_path}...")
-    make_thumb(dest_img, thumb_path, 1024, 88)
+    make_thumb(src_img, thumb_path, 1024, 88)
     
     row = {
         "file": f"images/{dest_img.name}",
-        "mtime": iso_mtime(dest_img),
+        "mtime": iso_mtime(src_img),
         "width_px": width_px,
         "height_px": height_px,
         "submission_id": subid,
@@ -411,6 +489,9 @@ def main():
         "catalog_identifier": meta["catalog_identifier"],
         "common_name": meta["common_name"]
     }
+    for k, v in meta.items():
+        if k not in row:
+            row[k] = v
     
     for k in row.keys():
         if k not in fieldnames:
@@ -424,7 +505,18 @@ def main():
         
         out_row = {f: row.get(f, "") for f in fieldnames}
         writer.writerow(out_row)
-        
+
+    if src_img.resolve() != dest_img.resolve():
+        stage_dir = (base_dir / "stage").resolve()
+        in_stage = src_img.resolve().parent == stage_dir
+        should_move = args.move or (in_stage and not args.copy)
+        if should_move:
+            print(f"Moving {src_img} to {dest_img}...")
+            shutil.move(str(src_img), str(dest_img))
+        else:
+            print(f"Copying {src_img} to {dest_img}...")
+            shutil.copy2(src_img, dest_img)
+
     print(f"Successfully added {dest_img.name} to {csv_file.name}")
 
 if __name__ == '__main__':

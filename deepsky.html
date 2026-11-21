@@ -443,11 +443,34 @@
       text-decoration: underline;
     }
 
+    #galleryToggle {
+      position: absolute;
+      top: 12px;
+      left: 60px;
+      z-index: 1001;
+      background: rgba(0,0,0,.7);
+      border: 1px solid rgba(255,255,255,.15);
+      border-radius: 50%;
+      width: 40px;
+      height: 40px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      pointer-events: auto;
+      backdrop-filter: blur(10px);
+      transition: background 0.15s, color 0.15s;
+    }
+
+    #galleryToggle:hover {
+      background: rgba(255,255,255,.18);
+    }
+
     #copyButton {
       position: fixed;
       top: 13px;
-      left: 64px;
-      zIndex: 30;
+      left: 112px;
+      z-index: 30;
       background: rgba(0,0,0,.5);
       border: 1px solid rgba(255,255,255,.18);
       border-radius: 8px;
@@ -457,8 +480,207 @@
       display: flex;
       align-items: center;
       gap: 6px;
-      fontSize: 13px;
+      font-size: 13px;
       transition: background .15s;
+    }
+
+    #galleryView {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 1200;
+      background: #07070a;
+      color: #cbb;
+      flex-direction: column;
+      pointer-events: auto;
+    }
+
+    #galleryHeader {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: safe center;
+      gap: 8px 10px;
+      padding: 10px 16px;
+      background: rgba(12, 12, 16, .92);
+      border-bottom: 1px solid rgba(255,255,255,.12);
+      backdrop-filter: blur(10px);
+      flex-shrink: 0;
+    }
+
+    #galleryHeader button {
+      background: rgba(255,255,255,.08);
+      border: 1px solid rgba(255,255,255,.15);
+      border-radius: 8px;
+      padding: 6px 10px;
+      font-size: 13px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: background 0.15s;
+    }
+
+    #galleryHeader button:hover {
+      background: rgba(255,255,255,.18);
+    }
+
+    #galleryBackBtn {
+      background: rgba(50,0,0,.7) !important;
+      font-weight: 600;
+    }
+
+    #galleryBackBtn:hover {
+      background: rgba(100,0,0,.75) !important;
+    }
+
+    #galleryFilters {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
+      flex: 1 1 320px;
+      min-inline-size: 0;
+    }
+
+    #galleryFilters input,
+    #galleryFilters select {
+      background: rgba(255,255,255,.07);
+      border: 1px solid rgba(255,255,255,.15);
+      border-radius: 6px;
+      color: #cbb;
+      padding: 6px 9px;
+      font-size: 13px;
+      box-sizing: border-box;
+    }
+
+    #galleryFilters input {
+      flex: 2 1 180px;
+      min-inline-size: 140px;
+    }
+
+    #galleryFilters select {
+      flex: 1 1 130px;
+      min-inline-size: 120px;
+    }
+
+    #galleryFilters select option {
+      background: #111;
+    }
+
+    #galleryCount {
+      font-size: 12px;
+      color: #999;
+      white-space: nowrap;
+      margin-inline-start: auto;
+    }
+
+    #galleryGridWrap {
+      flex: 1;
+      min-block-size: 0;
+      overflow-y: auto;
+      scrollbar-gutter: stable;
+      overscroll-behavior: contain;
+      padding: 16px;
+      box-sizing: border-box;
+    }
+
+    #galleryGrid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+      gap: 14px;
+      inline-size: 100%;
+    }
+
+    .gallery-card {
+      background: rgba(255,255,255,.04);
+      border: 1px solid rgba(255,255,255,.1);
+      border-radius: 10px;
+      overflow: clip;
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      transition: border-color 0.15s, background 0.15s, transform 0.15s;
+      content-visibility: auto;
+      contain-intrinsic-size: auto 240px auto 220px;
+    }
+
+    @supports not (content-visibility: auto) {
+      .gallery-card {
+        contain: layout style paint;
+      }
+    }
+
+    .gallery-card:hover,
+    .gallery-card:focus-visible {
+      border-color: rgba(0, 255, 255, .45);
+      background: rgba(255,255,255,.08);
+      outline: none;
+    }
+
+    .gallery-thumb-wrap {
+      aspect-ratio: 4 / 3;
+      inline-size: 100%;
+      background: #111;
+      overflow: clip;
+    }
+
+    .gallery-thumb {
+      inline-size: 100%;
+      block-size: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    .gallery-caption {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 10px;
+      min-inline-size: 0;
+    }
+
+    .gallery-meta {
+      flex: 1;
+      min-inline-size: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .gallery-title {
+      font-size: 13px;
+      color: #ddd;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .gallery-date {
+      font-size: 11px;
+      color: #888;
+    }
+
+    .gallery-sky-btn {
+      background: rgba(255,255,255,.08);
+      border: 1px solid rgba(255,255,255,.12);
+      border-radius: 6px;
+      padding: 4px 7px;
+      font-size: 13px;
+      cursor: pointer;
+      line-height: 1;
+      flex-shrink: 0;
+    }
+
+    .gallery-sky-btn:hover {
+      background: rgba(255,255,255,.2);
+    }
+
+    #galleryEmpty {
+      display: none;
+      text-align: center;
+      color: #888;
+      padding: 48px 16px;
+      font-size: 14px;
     }
 
     @media (max-width: 600px) {
@@ -468,8 +690,21 @@
       #status { display: none !important; }
       .zoom-hint { display: none !important; }
 
+      #galleryToggle {
+        left: 12px;
+      }
+
       #copyButton {
-        left: 13px;
+        left: 60px;
+      }
+
+      #galleryGridWrap {
+        padding: 10px;
+      }
+
+      #galleryGrid {
+        grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+        gap: 10px;
       }
 
       #overlay h2 { max-width: calc(100vw - 180px) !important; }
@@ -501,6 +736,14 @@
       <div id="copyright">Copyright 2023-2026 Benjamin J. Land</div>
     </div>
     <button id="listToggle" title='Toggle image list'>☰</button>
+    <button id="galleryToggle" title='Open thumbnail gallery (#gallery)' aria-label='Open thumbnail gallery'>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18">
+        <rect x="3" y="3" width="7" height="7" rx="1"/>
+        <rect x="14" y="3" width="7" height="7" rx="1"/>
+        <rect x="3" y="14" width="7" height="7" rx="1"/>
+        <rect x="14" y="14" width="7" height="7" rx="1"/>
+      </svg>
+    </button>
     <button id='copyButton' title='Copy link to this view'>
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16">
         <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
@@ -511,6 +754,24 @@
       <div id="filterBar"><!-- dynamic filter controls --></div>
       <div id="objectList"><!-- dynamic list items --></div>
     </div>
+    <section id="galleryView" aria-label="Image Gallery">
+      <header id="galleryHeader">
+        <button id="galleryBackBtn" title="Return to 3D sky view">← Sky</button>
+        <button id="galleryCopyBtn" title="Copy direct link to this gallery view">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="15" height="15">
+            <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
+            <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
+          </svg>
+          <span>Link</span>
+        </button>
+        <div id="galleryFilters"><!-- dynamic filter controls --></div>
+        <span id="galleryCount">Loading…</span>
+      </header>
+      <div id="galleryGridWrap">
+        <div id="galleryGrid"></div>
+        <div id="galleryEmpty">No images match the current filter.</div>
+      </div>
+    </section>
     <button id="helpToggle" title='View information about this page'>?</button>
     <div id="helpPanel">
       <button id="helpClose">X</button>
@@ -535,12 +796,13 @@
         <li><strong>Click an image</strong> — open full expanded view</li>
         <li><strong>Hover an image</strong> — show details panel</li>
       </ul>
-      <h3>List Panel (☰)</h3>
+      <h3>List Panel (☰) &amp; Gallery</h3>
       <ul>
-        <li>Filter images by camera or type</li>
+        <li>Filter images by name, camera, or type</li>
         <li><strong>👁</strong> — toggle visibility on the sky</li>
         <li><strong>⛶</strong> — open expanded view</li>
         <li><strong>🎯</strong> — fly to image on the sky</li>
+        <li><strong>Gallery button</strong> — browse all images as a thumbnail grid (direct link: <code>#gallery</code>)</li>
       </ul>
       <h3>Credits</h3>
       <p>
@@ -973,7 +1235,17 @@
       return catalog && common ? `${catalog} - ${common}` : (catalog || common || basename(row.file));
     }
 
-/*** List panel ***/
+/*** List panel & Gallery ***/
+
+    let catalogRows = [];
+    const filterState = { query: '', camera: '', type: '' };
+
+    function rowMatchesFilter(row, state = filterState) {
+      const query = state.query.toLowerCase();
+      return (!state.camera || row.Camera === state.camera) &&
+             (!state.type   || row['Image Type'] === state.type) &&
+             (!query        || rowTitle(row).toLowerCase().includes(query));
+    }
 
     const hiddenSet = new Set();
     const listToggleEl   = document.getElementById('listToggle');
@@ -982,17 +1254,17 @@
     const objectListEl   = document.getElementById('objectList');
 
     function applyFilters() {
-      const query    = filterBarEl.querySelector('#fSearch').value.toLowerCase();
-      const camVal   = filterBarEl.querySelector('#fCamera').value;
-      const typeVal  = filterBarEl.querySelector('#fType').value;
+      const fSearch = filterBarEl.querySelector('#fSearch');
+      const fCamera = filterBarEl.querySelector('#fCamera');
+      const fType   = filterBarEl.querySelector('#fType');
+      if (fSearch) filterState.query  = fSearch.value;
+      if (fCamera) filterState.camera = fCamera.value;
+      if (fType)   filterState.type   = fType.value;
 
       let total = 0;
       for (const mesh of clickable) {
         const row = mesh.userData;
-        const passFilter =
-          (!camVal  || row.Camera === camVal) &&
-          (!typeVal || row['Image Type'] === typeVal) &&
-          (!query   || rowTitle(row).toLowerCase().includes(query));
+        const passFilter = rowMatchesFilter(row);
 
         const passToggle = !hiddenSet.has(row.file);
         const visible = passFilter && passToggle;
@@ -1004,6 +1276,7 @@
         if (listItem) listItem.style.display = passFilter ? 'flex' : 'none';
       }
       setStatus(`Showing ${total} patches.`);
+      if (galleryBuilt) syncGalleryControlsFromState();
     }
 
 
@@ -1086,6 +1359,10 @@
           <button id="fHideAll">Hide all</button>
         </div>`;
 
+      filterBarEl.querySelector('#fSearch').value = filterState.query;
+      filterBarEl.querySelector('#fCamera').value = filterState.camera;
+      filterBarEl.querySelector('#fType').value   = filterState.type;
+
       filterBarEl.querySelector('#fSearch').oninput = applyFilters;
       filterBarEl.querySelector('#fCamera').onchange = applyFilters;
       filterBarEl.querySelector('#fType').onchange = applyFilters;
@@ -1112,6 +1389,16 @@
       }
     }
 
+    function syncSidebarControlsFromState() {
+      if (!sidebarBuilt) return;
+      const fSearch = filterBarEl.querySelector('#fSearch');
+      const fCamera = filterBarEl.querySelector('#fCamera');
+      const fType   = filterBarEl.querySelector('#fType');
+      if (fSearch) fSearch.value = filterState.query;
+      if (fCamera) fCamera.value = filterState.camera;
+      if (fType)   fType.value   = filterState.type;
+    }
+
     // Toggle button wires up and lazily populates on first open
     let sidebarBuilt = false;
     listToggleEl.onclick = () => {
@@ -1124,6 +1411,7 @@
         sidebarBuilt = true;
       }
       if (!open) {
+        syncSidebarControlsFromState();
         applyFilters();
       } else {
         showAllPatches();
@@ -1137,6 +1425,196 @@
       const open = listSidebarEl.style.display === 'flex';
       listToggleEl.style.background = open ? 'rgba(50,0,0,.7)' : 'rgba(0,0,0,.7)';
     };
+
+/*** Gallery view ***/
+
+    const galleryToggleEl  = document.getElementById('galleryToggle');
+    const galleryViewEl    = document.getElementById('galleryView');
+    const galleryBackBtn   = document.getElementById('galleryBackBtn');
+    const galleryCopyBtn   = document.getElementById('galleryCopyBtn');
+    const galleryFiltersEl = document.getElementById('galleryFilters');
+    const galleryCountEl   = document.getElementById('galleryCount');
+    const galleryGridEl    = document.getElementById('galleryGrid');
+    const galleryEmptyEl   = document.getElementById('galleryEmpty');
+
+    let galleryOpen = false;
+    let galleryBuilt = false;
+    let galleryCards = [];
+    let galleryFilteredRows = [];
+
+    function syncGalleryControlsFromState() {
+      if (!galleryBuilt) return;
+      const gSearch = galleryFiltersEl.querySelector('#gSearch');
+      const gCamera = galleryFiltersEl.querySelector('#gCamera');
+      const gType   = galleryFiltersEl.querySelector('#gType');
+      if (gSearch) gSearch.value = filterState.query;
+      if (gCamera) gCamera.value = filterState.camera;
+      if (gType)   gType.value   = filterState.type;
+    }
+
+    function applyGalleryFilters(updateHash = true) {
+      if (!galleryBuilt) return;
+      const gSearch = galleryFiltersEl.querySelector('#gSearch');
+      const gCamera = galleryFiltersEl.querySelector('#gCamera');
+      const gType   = galleryFiltersEl.querySelector('#gType');
+      if (gSearch) filterState.query  = gSearch.value;
+      if (gCamera) filterState.camera = gCamera.value;
+      if (gType)   filterState.type   = gType.value;
+
+      galleryFilteredRows = [];
+      for (const entry of galleryCards) {
+        const match = rowMatchesFilter(entry.row);
+        entry.el.style.display = match ? '' : 'none';
+        if (match) galleryFilteredRows.push(entry.row);
+      }
+
+      const shown = galleryFilteredRows.length;
+      const total = galleryCards.length;
+      galleryCountEl.textContent = shown === total ? `${total} images` : `${shown} / ${total} images`;
+      galleryEmptyEl.style.display = shown === 0 ? 'block' : 'none';
+
+      syncSidebarControlsFromState();
+      if (galleryOpen && updateHash) {
+        history.replaceState(null, '', encodeGalleryHash());
+      }
+    }
+
+    function buildGalleryCard(row) {
+      const title = rowTitle(row);
+      const date  = row.mtime?.split('T')[0] ?? '';
+
+      const card = document.createElement('article');
+      card.className = 'gallery-card';
+      card.tabIndex = 0;
+
+      const thumbWrap = document.createElement('div');
+      thumbWrap.className = 'gallery-thumb-wrap';
+
+      const thumb = document.createElement('img');
+      thumb.className = 'gallery-thumb';
+      thumb.loading = 'lazy';
+      thumb.decoding = 'async';
+      thumb.src = deriveThumbUrl(row);
+      thumb.alt = title;
+      thumbWrap.appendChild(thumb);
+
+      const caption = document.createElement('div');
+      caption.className = 'gallery-caption';
+
+      const meta = document.createElement('div');
+      meta.className = 'gallery-meta';
+
+      const titleEl = document.createElement('span');
+      titleEl.className = 'gallery-title';
+      titleEl.textContent = title;
+      titleEl.title = title;
+
+      const dateEl = document.createElement('span');
+      dateEl.className = 'gallery-date';
+      dateEl.textContent = date;
+
+      meta.append(titleEl, dateEl);
+      caption.appendChild(meta);
+
+      if (row.center_ra_deg && row.center_dec_deg) {
+        const skyBtn = document.createElement('button');
+        skyBtn.className = 'gallery-sky-btn';
+        skyBtn.type = 'button';
+        skyBtn.title = 'View on night sky';
+        skyBtn.textContent = '🎯';
+        skyBtn.onclick = (e) => {
+          e.stopPropagation();
+          closeGallery({ pushHistory: true });
+          flyToRow(row);
+        };
+        caption.appendChild(skyBtn);
+      }
+
+      card.onclick = () => expandedView(row, galleryFilteredRows);
+      card.onkeydown = (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          expandedView(row, galleryFilteredRows);
+        }
+      };
+
+      card.append(thumbWrap, caption);
+      return card;
+    }
+
+    function buildGallery() {
+      if (!catalogRows.length) return;
+      const cameras = [...new Set(catalogRows.map(r => r.Camera).filter(Boolean))].sort();
+      const types   = [...new Set(catalogRows.map(r => r['Image Type']).filter(Boolean))].sort();
+
+      const cameraOpts = cameras.map(c => `<option value="${c}">${c}</option>`).join('');
+      const typeOpts   = types.map(t => `<option value="${t}">${t}</option>`).join('');
+
+      galleryFiltersEl.innerHTML = `
+        <input id="gSearch" type="search" placeholder="Search by name…">
+        <select id="gCamera" aria-label="Filter by camera"><option value="">All cameras</option>${cameraOpts}</select>
+        <select id="gType" aria-label="Filter by image type"><option value="">All types</option>${typeOpts}</select>`;
+
+      galleryFiltersEl.querySelector('#gSearch').oninput = () => applyGalleryFilters(true);
+      galleryFiltersEl.querySelector('#gCamera').onchange = () => applyGalleryFilters(true);
+      galleryFiltersEl.querySelector('#gType').onchange = () => applyGalleryFilters(true);
+
+      galleryGridEl.innerHTML = '';
+      galleryCards = [];
+      const frag = document.createDocumentFragment();
+      for (const row of catalogRows) {
+        const el = buildGalleryCard(row);
+        galleryCards.push({ row, el });
+        frag.appendChild(el);
+      }
+      galleryGridEl.appendChild(frag);
+      galleryBuilt = true;
+      syncGalleryControlsFromState();
+      applyGalleryFilters(false);
+    }
+
+    function openGallery({ pushHistory = false } = {}) {
+      galleryOpen = true;
+      galleryViewEl.style.display = 'flex';
+      helpPanelEl.style.display = 'none';
+      helpToggleEl.style.background = 'rgba(0,0,0,.7)';
+      listSidebarEl.style.display = 'none';
+      listToggleEl.style.background = 'rgba(0,0,0,.7)';
+      hidePanel();
+
+      if (catalogRows.length) {
+        if (!galleryBuilt) buildGallery();
+        else {
+          syncGalleryControlsFromState();
+          applyGalleryFilters(false);
+        }
+      } else {
+        galleryCountEl.textContent = 'Loading…';
+      }
+
+      const targetHash = encodeGalleryHash();
+      if (window.location.hash !== targetHash) {
+        if (pushHistory) history.pushState(null, '', targetHash);
+        else history.replaceState(null, '', targetHash);
+      }
+    }
+
+    function closeGallery({ pushHistory = false } = {}) {
+      galleryOpen = false;
+      galleryViewEl.style.display = 'none';
+      const targetHash = encodeViewHash();
+      if (window.location.hash !== targetHash) {
+        if (pushHistory) history.pushState(null, '', targetHash);
+        else history.replaceState(null, '', targetHash);
+      }
+    }
+
+    galleryToggleEl.onclick = () => {
+      if (galleryOpen) closeGallery({ pushHistory: true });
+      else openGallery({ pushHistory: true });
+    };
+
+    galleryBackBtn.onclick = () => closeGallery({ pushHistory: true });
 
 /*** Camera flying ***/
 
@@ -1292,10 +1770,14 @@
       panelEl.innerHTML = '';
     }
 
-    function expandedView(force_row = null) {
+    function expandedView(force_row = null, navRows = null) {
       freezeCycle = true;
 
       const row = force_row ? force_row : getHoveredRow();
+      const navIndex = navRows ? navRows.indexOf(row) : -1;
+      const hasGalleryNav = Boolean(navRows && navRows.length > 1 && navIndex >= 0);
+      const hasSkyNav = !force_row && hoveredMeshes.length > 0;
+
       overlayEl.style.display = 'block';
       overlayContentEl.innerHTML = `
         <div id="overlayWindow">
@@ -1324,15 +1806,26 @@
       overlayContentEl.querySelector('#overlayClose').onclick = () => {
         overlayEl.style.display = 'none';
       };
-      overlayContentEl.querySelector('#zoomForward').style.display = force_row || hoveredMeshes.length == 0 ? 'none' : '';
-      overlayContentEl.querySelector('#zoomForward').onclick = () => {
-        cycleUp();
-        expandedView();
+      const forwardBtn = overlayContentEl.querySelector('#zoomForward');
+      const backBtn = overlayContentEl.querySelector('#zoomBack');
+      forwardBtn.style.display = (hasGalleryNav || hasSkyNav) ? '' : 'none';
+      backBtn.style.display = (hasGalleryNav || hasSkyNav) ? '' : 'none';
+
+      forwardBtn.onclick = () => {
+        if (hasGalleryNav) {
+          expandedView(navRows[(navIndex + 1) % navRows.length], navRows);
+        } else {
+          cycleUp();
+          expandedView();
+        }
       };
-      overlayContentEl.querySelector('#zoomBack').style.display = force_row || hoveredMeshes.length == 0 ? 'none' : '';
-      overlayContentEl.querySelector('#zoomBack').onclick = () => {
-        cycleDown();
-        expandedView();
+      backBtn.onclick = () => {
+        if (hasGalleryNav) {
+          expandedView(navRows[(navIndex - 1 + navRows.length) % navRows.length], navRows);
+        } else {
+          cycleDown();
+          expandedView();
+        }
       };
 
       overlayContentEl.querySelector('#zoomInfo').onclick = () => {
@@ -1560,7 +2053,7 @@
 
     function isUIEvent(event) {
       return event.target.closest(
-        '#panel, #listSidebar, #listToggle, #overlay, #status, #zoomPanel, #helpPanel, #helpToggle'
+        '#panel, #listSidebar, #listToggle, #galleryToggle, #galleryView, #copyButton, #overlay, #status, #zoomPanel, #helpPanel, #helpToggle'
       );
     }
 
@@ -1627,6 +2120,10 @@
       try {
         const rows = await loadCsv(CSV_URL);
         let solved = rows.filter(r => (r.solve_status == 'solved' || r.solve_status == 'cached') && r.patch_json_file);
+        catalogRows = [...solved].sort((a, b) => (b.mtime ?? '').localeCompare(a.mtime ?? ''));
+        if (galleryOpen) {
+          buildGallery();
+        }
         setStatus(`Loading ${solved.length} curved patches...`);
 
         // Sort by angular area descending (larger/deeper)
@@ -1754,8 +2251,10 @@
         controls.update();
       }
 
-      renderer.render(scene, camera);
-      labelRenderer.render(scene, camera);
+      if (!galleryOpen) {
+        renderer.render(scene, camera);
+        labelRenderer.render(scene, camera);
+      }
     }
 
 /*** Permalink / URL hash view state ***/
@@ -1767,6 +2266,29 @@
       const phi   = parseFloat(THREE.MathUtils.radToDeg(s.phi).toFixed(2));
       const fov   = parseFloat(camera.fov.toFixed(2));
       return `#v=${theta},${phi},${fov}`;
+    }
+
+    // Encode gallery view state as #gallery (with optional filter params)
+    function encodeGalleryHash() {
+      const params = [];
+      if (filterState.query)  params.push(`q=${encodeURIComponent(filterState.query)}`);
+      if (filterState.camera) params.push(`cam=${encodeURIComponent(filterState.camera)}`);
+      if (filterState.type)   params.push(`type=${encodeURIComponent(filterState.type)}`);
+      return params.length ? `#gallery&${params.join('&')}` : '#gallery';
+    }
+
+    // Decode gallery hash and return {query, camera, type} or null
+    function decodeGalleryHash(hash) {
+      if (!/^#gallery(?:$|&)/i.test(hash)) return null;
+      const out = { query: '', camera: '', type: '' };
+      const rest = hash.replace(/^#gallery&?/i, '');
+      if (rest) {
+        const sp = new URLSearchParams(rest);
+        out.query  = sp.get('q') || '';
+        out.camera = sp.get('cam') || '';
+        out.type   = sp.get('type') || '';
+      }
+      return out;
     }
 
     // Decode hash and return {theta, phi, fov} or null
@@ -1793,17 +2315,47 @@
       controls.rotateSpeed = THREE.MathUtils.clamp(camera.fov / 50 * -0.35, -0.75, -0.001);
     }
 
-    // Restore from hash on load
-    (function restoreFromHash() {
-      const vs = decodeViewHash(window.location.hash);
+    function applyHashState(hash) {
+      const gs = decodeGalleryHash(hash);
+      if (gs) {
+        filterState.query  = gs.query;
+        filterState.camera = gs.camera;
+        filterState.type   = gs.type;
+        openGallery({ pushHistory: false });
+        return;
+      }
+      if (galleryOpen) {
+        closeGallery({ pushHistory: false });
+      }
+      const vs = decodeViewHash(hash);
       if (vs) applyViewState(vs);
-    })();
+    }
+
+    // Restore from hash on load and respond to browser back/forward
+    applyHashState(window.location.hash);
+    window.addEventListener('hashchange', () => applyHashState(window.location.hash));
+
+    // Keyboard shortcuts for expanded lightbox overlay
+    window.addEventListener('keydown', (e) => {
+      if (overlayEl.style.display === 'none') return;
+      if (e.key === 'Escape') {
+        overlayEl.style.display = 'none';
+      } else if (e.key === 'ArrowRight') {
+        const nextBtn = overlayContentEl.querySelector('#zoomForward');
+        if (nextBtn && nextBtn.style.display !== 'none') nextBtn.click();
+      } else if (e.key === 'ArrowLeft') {
+        const prevBtn = overlayContentEl.querySelector('#zoomBack');
+        if (prevBtn && prevBtn.style.display !== 'none') prevBtn.click();
+      }
+    });
 
     // Debounced hash updater: fires 1.2s after the user stops interacting
     let _hashTimer = null;
     function scheduleHashUpdate() {
+      if (galleryOpen) return;
       if (_hashTimer) clearTimeout(_hashTimer);
       _hashTimer = setTimeout(() => {
+        if (galleryOpen) return;
         const newHash = encodeViewHash();
         history.replaceState(null, '', newHash);
         _hashTimer = null;
@@ -1813,28 +2365,33 @@
     // Update hash whenever OrbitControls moves the camera
     controls.addEventListener('change', scheduleHashUpdate);
 
+    function copyCurrentLink(targetBtn, defaultHtml) {
+      const newHash = galleryOpen ? encodeGalleryHash() : encodeViewHash();
+      history.replaceState(null, '', newHash);
+      const url = window.location.href;
+      navigator.clipboard.writeText(url).then(() => {
+        targetBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><polyline points="20 6 9 17 4 12"/></svg>\u00a0Copied!`;
+        setTimeout(() => {
+          targetBtn.innerHTML = defaultHtml;
+        }, 2000);
+      }).catch(() => {
+        // Clipboard API unavailable (non-HTTPS/non-focus); show prompt fallback
+        prompt('Copy this link:', url);
+      });
+    }
+
     const btn = document.getElementById('copyButton');
+    const copyButtonDefaultHtml = btn.innerHTML;
     btn.onmouseenter = () => {
       btn.style.background = 'rgba(255,255,255,.15)';
     };
     btn.onmouseleave = () => {
       btn.style.background = 'rgba(0,0,0,.5)';
     };
-    btn.onclick = () => {
-      // Snap the hash right now (don't wait for debounce)
-      const newHash = encodeViewHash();
-      history.replaceState(null, '', newHash);
-      const url = window.location.href;
-      navigator.clipboard.writeText(url).then(() => {
-        btn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><polyline points="20 6 9 17 4 12"/></svg>\u00a0Copied!`;
-        setTimeout(() => {
-          btn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>`;
-        }, 2000);
-      }).catch(() => {
-        // Clipboard API unavailable (non-HTTPS/non-focus); show prompt fallback
-        prompt('Copy this link:', url);
-      });
-    };
+    btn.onclick = () => copyCurrentLink(btn, copyButtonDefaultHtml);
+
+    const galleryCopyDefaultHtml = galleryCopyBtn.innerHTML;
+    galleryCopyBtn.onclick = () => copyCurrentLink(galleryCopyBtn, galleryCopyDefaultHtml);
 
     buildRaDecOverlay();
     buildAntisolarRing();
